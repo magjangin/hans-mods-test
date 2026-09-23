@@ -1,0 +1,29 @@
+# Windows Thumbnail & Desktop files
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+
+# Editor & IDE settings
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# UE4SS and Engine Logs / Temp files
+*.log
+*.tmp
+UE4SS.log
+ue4ss.log
+ue4ss.log.*
+UE4SS_Crash_*.dmp
+CrashDump/
+
+# PowerShell history & temp
+*.swp
+*.bak
+*~
