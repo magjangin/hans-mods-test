@@ -9,7 +9,6 @@
 [![Engine](https://img.shields.io/badge/Engine-Unreal%20Engine-313131?style=for-the-badge&logo=unrealengine&logoColor=white)](https://www.unrealengine.com/)
 [![Modloader](https://img.shields.io/badge/Modloader-UE4SS%20v3.0+-orange?style=for-the-badge)](https://github.com/UE4SS-RE/RE-UE4SS)
 [![Language](https://img.shields.io/badge/Script-Lua%205.4-000080?style=for-the-badge&logo=lua&logoColor=white)](https://www.lua.org/)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 <br/>
 
@@ -197,9 +196,3 @@ hans-mods-test/
 
 **Q3. 모드를 완전히 제거하고 순정 상태로 되돌리고 싶습니다.**
 - `3_모드연결해제.bat`를 실행하면 게임 폴더의 링크와 `mods.txt` 설정이 원상태로 깨끗이 복원됩니다.
-
----
-
-## 📄 라이선스 (License)
-
-본 프로젝트는 [MIT License](LICENSE)에 따라 배포됩니다.
