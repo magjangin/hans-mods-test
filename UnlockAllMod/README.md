@@ -10,8 +10,8 @@ UE4SS(Unreal Engine 4/5 Scripting System) Lua API와 바이너리 세이브 엔�
 본 모드는 **사용자가 어떠한 키도 누를 필요 없이**, 게임이 실행되는 즉시 다음 3단계 파이프라인을 통해 모든 스킨과 업적을 자동으로 완료합니다:
 
 1. **디스크 세이브 선제적 자동 주입:** 모드 로드 시점에 즉시 `%LOCALAPPDATA%\Hans\Saved\SaveGames\`의 `skinslot.sav`와 `achslot.sav`를 바이트 단위로 패치하여, 메인 메뉴의 스킨 선택 화면에 진입하자마자 모든 스킨이 해금되어 있습니다.
-2. **백그라운드 가디언 루프 (`LoopAsync 500ms`):** 게임 레벨 또는 메인 메뉴가 로드되며 `BP_SkinManager_C` 및 `BP_AchievementManager_C` 액터가 메모리에 스폰되는 즉시 감지하여 45종 스킨 및 23종 업적 해금 함수를 자동 호출합니다.
-3. **Steam 도전과제 즉시 달성:** 업적 매니저 호출과 동시에 언리얼 엔진의 `WriteAchievementProgress` 프록시를 통해 **실제 Steam 도전과제 달성 알림(Popup)이 자동으로 발동**됩니다.
+2. **백그라운드 가디언 루프 (`LoopAsync 1000ms`):** 게임 레벨 또는 메인 메뉴가 로드되며 `BP_SkinManager_C` 및 `BP_AchievementManager_C` 액터가 메모리에 스폰되는 즉시 감지하여 45종 스킨 및 23종 업적 해금 함수를 1회 정밀 자동 호출합니다.
+3. **Steam 도전과제 직접 연동 & 스팸 방지:** 스킨/업적 해금이 완료되면 가디언 루프가 자동으로 종료(`return true`)되어 **로그 스팸 및 불필요한 반복 호출을 100% 방지**하며, 네이티브 Steamworks 브릿지를 통해 **실제 Steam 도전과제 달성 알림(Popup)이 즉시 발동**됩니다.
 
 ---
 

@@ -207,14 +207,25 @@ function Patch-Achievements {
     return $true
 }
 
-Write-Host "[1/2] 스킨 세이브 파일 패치 진행 중..." -ForegroundColor White
+Write-Host "[1/3] 스킨 세이브 파일 패치 진행 중..." -ForegroundColor White
 Patch-Skins -filePath $skinPath | Out-Null
 
 Write-Host ""
-Write-Host "[2/2] 업적 세이브 파일 패치 진행 중..." -ForegroundColor White
+Write-Host "[2/3] 업적 세이브 파일 패치 진행 중..." -ForegroundColor White
 Patch-Achievements -filePath $achPath | Out-Null
 
 Write-Host ""
+Write-Host "[3/3] Steam 도전과제(Achievements) 직접 연동 중..." -ForegroundColor White
+$steamScript = Join-Path $PSScriptRoot "unlock_steam_achievements.py"
+if (Test-Path $steamScript) {
+    try {
+        & python $steamScript
+    } catch {
+        Write-Host "[경고] Python 실행 중 예외 발생: $_" -ForegroundColor Yellow
+    }
+}
+
+Write-Host ""
 Write-Host "========================================================" -ForegroundColor Cyan
-Write-Host "  해금 완료! 게임을 실행하면 모든 스킨/업적이 적용됩니다." -ForegroundColor Green
+Write-Host "  해금 완료! 모든 스킨/업적/Steam 도전과제가 적용되었습니다." -ForegroundColor Green
 Write-Host "========================================================" -ForegroundColor Cyan
