@@ -72,6 +72,13 @@ if ((Test-Path $modsTxt) -and ($linked.Count -gt 0)) {
     }
 }
 
+# 3. 모든 스킨 & 업적 세이브 선제적 자동 패치
+$unlockScript = Join-Path $PSScriptRoot "unlock_all.ps1"
+if (Test-Path $unlockScript) {
+    Write-Host ""
+    & $unlockScript
+}
+
 Write-Host ""
 Write-Host "========================================================" -ForegroundColor Cyan
 Write-Host "  모드 준비 완료! 게임을 실행하세요." -ForegroundColor Green
@@ -88,7 +95,6 @@ Write-Host "  [WindowModeFix]" -ForegroundColor Cyan
 Write-Host "  메인 메뉴 전체화면 강제 버그 자동 복원 (무간섭 동작)" -ForegroundColor White
 Write-Host ""
 Write-Host "  [UnlockAllMod]" -ForegroundColor Cyan
-Write-Host "  [F7] / [Num 7] : 모든 45종 스킨 해금" -ForegroundColor White
-Write-Host "  [F8] / [Num 8] : 모든 23종 업적 해금 & Steam 도전과제 달성" -ForegroundColor White
-Write-Host "  [F9] / [Num 9] : 스킨 + 업적 올인원 전체 해금" -ForegroundColor White
+Write-Host "  ★ 키 입력 없이 게임 실행 시 45종 스킨 & 23종 업적 전자동 해금!" -ForegroundColor Yellow
+Write-Host "  (비상 수동 단축키: [F7] 스킨 / [F8] 업적&Steam / [F9] 전체)" -ForegroundColor DarkGray
 Write-Host "========================================================" -ForegroundColor Cyan

@@ -1,11 +1,9 @@
 local UEHelpers = require("UEHelpers")
 
 print("==================================================")
-print("[UnlockAllMod] Hans Skin & Achievement Unlocker Loading...")
+print("[UnlockAllMod] Hans Skin & Achievement Auto-Unlocker Loading...")
 print("==================================================")
 
--- Configuration
-local AutoUnlockOnStart = true
 local NUM_SKINS = 45        -- E_Skins::Type 0..44 (45 skins)
 local NUM_ACHIEVEMENTS = 23 -- EAchievements::Type 0..22 (23 achievements)
 
@@ -25,7 +23,7 @@ local function PackI64(n)
 end
 
 -- -----------------------------------------------------------------------------
--- SaveGame Direct File Patcher (이중 안전장치)
+-- SaveGame Direct File Patcher (디스크 세이브 파일 즉각 주입)
 -- -----------------------------------------------------------------------------
 local function PatchSkinsSave()
     local localAppData = os.getenv("LOCALAPPDATA")
@@ -33,19 +31,13 @@ local function PatchSkinsSave()
     local filePath = localAppData .. "\\Hans\\Saved\\SaveGames\\skinslot.sav"
 
     local file = io.open(filePath, "rb")
-    if not file then
-        print("[UnlockAllMod] [Info] skinslot.sav not found on disk yet.")
-        return false
-    end
+    if not file then return false end
     local data = file:read("*a")
     file:close()
 
     local searchTag = "SavedSkins\0"
     local idx = string.find(data, searchTag, 1, true)
-    if not idx then
-        print("[UnlockAllMod] [Warn] SavedSkins tag not found in skinslot.sav.")
-        return false
-    end
+    if not idx then return false end
 
     local prefix = string.sub(data, 1, idx - 1)
 
@@ -72,7 +64,7 @@ local function PatchSkinsSave()
     if outFile then
         outFile:write(newContent)
         outFile:close()
-        print(string.format("[UnlockAllMod] [OK] skinslot.sav successfully patched with all %d skins!", NUM_SKINS))
+        print(string.format("[UnlockAllMod] [디스크] skinslot.sav에 %d개 모든 스킨 자동 주입 완료!", NUM_SKINS))
         return true
     end
     return false
@@ -84,19 +76,13 @@ local function PatchAchievementsSave()
     local filePath = localAppData .. "\\Hans\\Saved\\SaveGames\\achslot.sav"
 
     local file = io.open(filePath, "rb")
-    if not file then
-        print("[UnlockAllMod] [Info] achslot.sav not found on disk yet.")
-        return false
-    end
+    if not file then return false end
     local data = file:read("*a")
     file:close()
 
     local searchTag = "Achievements\0"
     local idx = string.find(data, searchTag, 1, true)
-    if not idx then
-        print("[UnlockAllMod] [Warn] Achievements tag not found in achslot.sav.")
-        return false
-    end
+    if not idx then return false end
 
     local prefix = string.sub(data, 1, idx - 1)
 
@@ -123,23 +109,18 @@ local function PatchAchievementsSave()
     if outFile then
         outFile:write(newContent)
         outFile:close()
-        print(string.format("[UnlockAllMod] [OK] achslot.sav successfully patched with all %d achievements!", NUM_ACHIEVEMENTS))
+        print(string.format("[UnlockAllMod] [디스크] achslot.sav에 %d개 모든 업적 자동 주입 완료!", NUM_ACHIEVEMENTS))
         return true
     end
     return false
 end
 
 -- -----------------------------------------------------------------------------
--- In-Game Runtime Unlock Logic
+-- In-Game Runtime Unlock Functions
 -- -----------------------------------------------------------------------------
-local function UnlockAllSkins()
-    print("\n[UnlockAllMod] ========================================")
-    print(string.format("[UnlockAllMod] 모든 %d종 스킨 해금 시작...", NUM_SKINS))
-
-    -- 1. 디스크 세이브 파일 선제적 패치
+local function UnlockAllSkins(isAuto)
     PatchSkinsSave()
 
-    -- 2. 런타임 메모리 액터에 함수 호출
     ExecuteInGameThread(function()
         local skinManagers = FindAllOf("BP_SkinManager_C")
         if skinManagers and #skinManagers > 0 then
@@ -150,23 +131,15 @@ local function UnlockAllSkins()
                     end
                 end
             end
-            print(string.format("[UnlockAllMod] [OK] BP_SkinManager_C에 %d개 스킨 언락 호출 완료!", NUM_SKINS))
-        else
-            print("[UnlockAllMod] [Info] 현재 레벨에 BP_SkinManager_C 없음 (세이브 파일 패치 완료)")
+            local prefix = isAuto and "[UnlockAllMod] [자동완료]" or "[UnlockAllMod] [수동완료]"
+            print(string.format("%s BP_SkinManager_C에 %d개 스킨 언락 호출 완료!", prefix, NUM_SKINS))
         end
     end)
-
-    print("[UnlockAllMod] ========================================\n")
 end
 
-local function UnlockAllAchievements()
-    print("\n[UnlockAllMod] ========================================")
-    print(string.format("[UnlockAllMod] 모든 %d종 업적 해금 및 Steam 트리거 시작...", NUM_ACHIEVEMENTS))
-
-    -- 1. 디스크 세이브 파일 선제적 패치
+local function UnlockAllAchievements(isAuto)
     PatchAchievementsSave()
 
-    -- 2. 런타임 메모리 액터에 함수 호출 (Steam 업적 팝업 트리거)
     ExecuteInGameThread(function()
         local achManagers = FindAllOf("BP_AchievementManager_C")
         if achManagers and #achManagers > 0 then
@@ -177,46 +150,63 @@ local function UnlockAllAchievements()
                     end
                 end
             end
-            print(string.format("[UnlockAllMod] [OK] BP_AchievementManager_C에 %d개 업적 언락 & Steam 전송 호출 완료!", NUM_ACHIEVEMENTS))
-        else
-            print("[UnlockAllMod] [Info] 현재 레벨에 BP_AchievementManager_C 없음 (세이브 파일 패치 완료)")
+            local prefix = isAuto and "[UnlockAllMod] [자동완료]" or "[UnlockAllMod] [수동완료]"
+            print(string.format("%s BP_AchievementManager_C에 %d개 업적 언락 & Steam 전송 완료!", prefix, NUM_ACHIEVEMENTS))
         end
     end)
-
-    print("[UnlockAllMod] ========================================\n")
 end
 
-local function UnlockEverything()
-    print("\n[UnlockAllMod] [All-In-One] 모든 스킨 + 모든 업적 전체 해금 실행!")
-    UnlockAllSkins()
-    UnlockAllAchievements()
+local function UnlockEverything(isAuto)
+    UnlockAllSkins(isAuto)
+    UnlockAllAchievements(isAuto)
 end
 
 -- -----------------------------------------------------------------------------
--- Keybinds
+-- 전자동 백그라운드 가디언 루프 (키 입력 불필요)
+-- 게임 실행 시 및 레벨/메뉴 진입 시 매니저 액터를 자동 감지하여 즉시 해금
 -- -----------------------------------------------------------------------------
--- F7 / Num 7: Unlock All Skins
-RegisterKeyBind(Key.F7, UnlockAllSkins)
-RegisterKeyBind(Key.NUM_SEVEN, UnlockAllSkins)
+-- 1. 모드 로드 즉시 세이브 파일 1차 선제적 패치
+PatchSkinsSave()
+PatchAchievementsSave()
 
--- F8 / Num 8: Unlock All Achievements
-RegisterKeyBind(Key.F8, UnlockAllAchievements)
-RegisterKeyBind(Key.NUM_EIGHT, UnlockAllAchievements)
+local LastUnlockedSkinManager = nil
+local LastUnlockedAchManager = nil
 
--- F9 / Num 9: Unlock All Skins & Achievements
-RegisterKeyBind(Key.F9, UnlockEverything)
-RegisterKeyBind(Key.NUM_NINE, UnlockEverything)
+LoopAsync(500, function()
+    ExecuteInGameThread(function()
+        -- 스킨 매니저 자동 감지 및 즉시 해금
+        local sm = FindFirstOf("BP_SkinManager_C")
+        if sm and sm:IsValid() and sm ~= LastUnlockedSkinManager then
+            LastUnlockedSkinManager = sm
+            for i = 0, NUM_SKINS - 1 do
+                pcall(function() sm:UnlockASkin(i) end)
+            end
+            print(string.format("[UnlockAllMod] [자동 감지] BP_SkinManager_C 스폰 감지 -> %d개 모든 스킨 자동 해금 완료!", NUM_SKINS))
+        end
 
--- -----------------------------------------------------------------------------
--- Auto Unlock on Start
--- -----------------------------------------------------------------------------
-if AutoUnlockOnStart then
-    ExecuteWithDelay(2000, function()
-        UnlockEverything()
+        -- 업적 매니저 자동 감지 및 즉시 해금 (Steam 도전과제 연동)
+        local am = FindFirstOf("BP_AchievementManager_C")
+        if am and am:IsValid() and am ~= LastUnlockedAchManager then
+            LastUnlockedAchManager = am
+            for i = 0, NUM_ACHIEVEMENTS - 1 do
+                pcall(function() am:UnlockAchievement(i) end)
+            end
+            print(string.format("[UnlockAllMod] [자동 감지] BP_AchievementManager_C 스폰 감지 -> %d개 모든 업적 자동 해금 및 Steam 전송 완료!", NUM_ACHIEVEMENTS))
+        end
     end)
-end
+    return false -- 백그라운드 루프 지속 유지
+end)
 
-print("[UnlockAllMod] Loaded! 단축키:")
-print("  - [F7] / [Num 7]: 모든 45종 스킨 해금 (Unlock All 45 Skins)")
-print("  - [F8] / [Num 8]: 모든 23종 업적 해금 및 Steam 등록 (Unlock All Achievements & Steam)")
-print("  - [F9] / [Num 9]: 스킨 + 업적 올인원 즉시 해금 (Unlock Everything)")
+-- -----------------------------------------------------------------------------
+-- 수동 비상 단축키 (필요 시 직접 누를 수도 있음)
+-- -----------------------------------------------------------------------------
+RegisterKeyBind(Key.F7, function() UnlockAllSkins(false) end)
+RegisterKeyBind(Key.NUM_SEVEN, function() UnlockAllSkins(false) end)
+
+RegisterKeyBind(Key.F8, function() UnlockAllAchievements(false) end)
+RegisterKeyBind(Key.NUM_EIGHT, function() UnlockAllAchievements(false) end)
+
+RegisterKeyBind(Key.F9, function() UnlockEverything(false) end)
+RegisterKeyBind(Key.NUM_NINE, function() UnlockEverything(false) end)
+
+print("[UnlockAllMod] 준비 완료: 키 입력 없이 게임 실행 시 모든 스킨 및 업적이 전자동으로 즉시 해금됩니다.")
