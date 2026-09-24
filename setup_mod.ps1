@@ -1,7 +1,7 @@
-﻿$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
 $gameModsDir = "H:\steam\steamapps\common\HANS\Hans\Binaries\Win64\ue4ss\Mods"
-$modNames = @("GravityMod", "WindowModeFix")
+$modNames = @("GravityMod", "WindowModeFix", "UnlockAllMod")
 $modsTxt = Join-Path $gameModsDir "mods.txt"
 
 Write-Host "========================================================" -ForegroundColor Cyan
@@ -85,6 +85,10 @@ Write-Host "  [F5] / [Num 5] : 공중 부유 (0.05x)" -ForegroundColor White
 Write-Host "  [F6]           : 현재 실제 적용 중력 확인" -ForegroundColor White
 Write-Host ""
 Write-Host "  [WindowModeFix]" -ForegroundColor Cyan
-Write-Host "  메인 메뉴가 강제하는 전체화면을 Settings.ini에 저장된" -ForegroundColor White
-Write-Host "  창 모드로 되돌립니다. (단축키 없음, 자동 동작)" -ForegroundColor White
+Write-Host "  메인 메뉴 전체화면 강제 버그 자동 복원 (무간섭 동작)" -ForegroundColor White
+Write-Host ""
+Write-Host "  [UnlockAllMod]" -ForegroundColor Cyan
+Write-Host "  [F7] / [Num 7] : 모든 45종 스킨 해금" -ForegroundColor White
+Write-Host "  [F8] / [Num 8] : 모든 23종 업적 해금 & Steam 도전과제 달성" -ForegroundColor White
+Write-Host "  [F9] / [Num 9] : 스킨 + 업적 올인원 전체 해금" -ForegroundColor White
 Write-Host "========================================================" -ForegroundColor Cyan

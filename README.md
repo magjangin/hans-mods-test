@@ -2,7 +2,7 @@
 
 # 🎮 HANS UE4SS Mod Collection
 
-**Steam 인디 정밀 플랫포머 게임 [HANS](https://store.steampowered.com/app/2616420/HANS/)를 위한 고성능 UE4SS Lua 모드 패키지**
+**Steam 인디 정밀 플랫포amer 게임 [HANS](https://store.steampowered.com/app/2616420/HANS/)를 위한 고성능 UE4SS Lua 모드 패키지**
 
 [![Game](https://img.shields.io/badge/Game-HANS%20(Steam)-1b2838?style=for-the-badge&logo=steam&logoColor=white)](https://store.steampowered.com/app/2616420/HANS/)
 [![AppID](https://img.shields.io/badge/AppID-2616420-blue?style=for-the-badge&logo=steam)](https://steamdb.info/app/2616420/)
@@ -20,10 +20,11 @@
 
 ## 📖 개요 (Overview)
 
-본 저장소는 극한의 난이도를 자랑하는 물리 점프 액션 게임 **HANS**에서 플레이어 편의성을 극대화하고 게임 자체의 엔진 결함을 교정하기 위해 개발된 **UE4SS(Unreal Engine 4/5 Scripting System)** 기반의 Lua 모드 모음집입니다.
+본 저장소는 극한의 난이도를 자랑하는 물리 점프 액션 게임 **HANS**에서 플레이어 편의성을 극대화하고 게임 자체의 엔진 결함을 교정하며, 모든 콘텐츠를 즉시 즐길 수 있도록 개발된 **UE4SS(Unreal Engine 4/5 Scripting System)** 기반의 Lua 모드 모음집입니다.
 
 * 🕹️ **GravityMod:** 맵 이동 및 리스폰 시에도 풀리지 않는 실시간 중력 제어기 (무중력, 달 중력, 공중 부유 등)
 * 🖥️ **WindowModeFix:** 타이틀 및 메인 메뉴 진입 시 창 모드가 강제로 전체화면으로 초기화되는 버그의 무간섭 자동 교정기
+* 🏆 **UnlockAllMod:** 45종 모든 수박 스킨 및 23종 모든 업적(실제 Steam 도전과제 연동 포함) 실시간/오프라인 올인원 해금기
 * ⚡ **Hot-Sync 배포 자동화:** NTFS Directory Junction을 활용하여 파일 복사 없이 코드 수정이 게임에 즉각 반영되는 원클릭 관리 스크립트 제공
 
 ---
@@ -60,9 +61,27 @@ HANS의 내장 블루프린트(`WBP_MainMenuUI`)는 메인 메뉴에 진입할 �
 
 ---
 
+### 3. 🏆 UnlockAllMod (모든 스킨 & 업적 올인원 해금기)
+> **모듈 경로:** [`UnlockAllMod/`](file:///h:/ue4ss%20mod%20test/hans%20mods%20test/UnlockAllMod) | **상세 문서:** [`UnlockAllMod/README.md`](file:///h:/ue4ss%20mod%20test/hans%20mods%20test/UnlockAllMod/README.md)
+
+게임 내 숨겨진 **45종 모든 수박 스킨**과 **23종 모든 업적(실제 Steam 도전과제 팝업 트리거 연동)**을 즉시 해금합니다.
+
+#### 🎮 조작 단축키 매핑 테이블
+| 단축키 | 넘패드 | 기능 | 설명 |
+| :---: | :---: | :--- | :--- |
+| **`F7`** | **`Num 7`** | **모든 스킨 해금 (All Skins)** | 45종 모든 수박 스킨 즉시 해금 및 세이브 슬롯 영구 반영 |
+| **`F8`** | **`Num 8`** | **모든 업적 해금 (All Achievements)** | 23종 모든 업적 해금 및 Steam 도전과제 즉시 팝업 트리거 |
+| **`F9`** | **`Num 9`** | **올인원 전체 해금 (Unlock Everything)** | 스킨 45종 + 업적 23종을 한번에 전체 해금 |
+
+* **이중 안전장치(Dual Guarantee):** 인게임 런타임 액터(`BP_SkinManager_C`, `BP_AchievementManager_C`)에 UFunction을 호출함과 동시에, 디스크의 바이너리 세이브 파일(`skinslot.sav`, `achslot.sav`)을 직접 패치하여 메인 메뉴 화면에서도 100% 즉시 반영됩니다.
+* **자동 실행(Auto Unlock):** 게임 구동 2초 후 백그라운드에서 1회 자동 해금이 실행됩니다.
+* **원클릭 오프라인 패처:** 게임을 켜지 않고도 `4_스킨_업적_즉시해금.bat`를 더블 클릭하여 즉시 세이브를 100% 해금 상태로 생성/갱신할 수 있습니다.
+
+---
+
 ## 🔬 기술 아키텍처 & 동작 원리
 
-### 언리얼 엔진 중력 계산 파이프라인
+### 1. 언리얼 엔진 중력 계산 파이프라인
 언리얼 엔진의 `CharacterMovementComponent`는 다음과 같은 계층 구조로 캐릭터 최종 중력을 산출합니다:
 
 $$\text{Player Gravity} = \text{WorldSettings:GetGravityZ()} \times \text{CharacterMovement.GravityScale}$$
@@ -84,7 +103,7 @@ flowchart TD
     end
 ```
 
-### 창 모드 버그 픽스 후킹 메커니즘
+### 2. 창 모드 버그 픽스 후킹 메커니즘
 ```mermaid
 sequenceDiagram
     autonumber
@@ -110,6 +129,26 @@ sequenceDiagram
     end
 ```
 
+### 3. 모든 스킨 및 업적 해금 메커니즘
+```mermaid
+flowchart LR
+    subgraph "UnlockAllMod 실행"
+        Trigger[F7 / F8 / F9 또는 게임 시작 자동]
+    end
+
+    subgraph "인게임 런타임 (UE4SS)"
+        Trigger --> SM[BP_SkinManager_C:UnlockASkin 0..44]
+        Trigger --> AM[BP_AchievementManager_C:UnlockAchievement 0..22]
+        AM --> Proxy[BP_Achievement_C 스폰]
+        Proxy --> Steam[Steamworks API: WriteAchievementProgress]
+    end
+
+    subgraph "세이브 파일 패처 (GVAS 바이너리 엔진)"
+        Trigger --> PatchSkin[skinslot.sav: SavedSkins Map 주입]
+        Trigger --> PatchAch[achslot.sav: Achievements Map 주입]
+    end
+```
+
 ---
 
 ## 🚀 빠른 시작 (원클릭 배치 스크립트)
@@ -118,9 +157,10 @@ sequenceDiagram
 
 | 번호 | 실행 파일 | 설명 | 내부 실행 메커니즘 |
 | :---: | :--- | :--- | :--- |
-| **`1`** | **`1_모드연결_및_활성화.bat`** | **모드 연결 및 활성화** | 게임 UE4SS `Mods` 폴더에 NTFS Junction을 연결하고 `mods.txt`에 활성화 등록 |
+| **`1`** | **`1_모드연결_및_활성화.bat`** | **모드 연결 및 활성화** | 게임 UE4SS `Mods` 폴더에 NTFS Junction을 연결하고 `mods.txt`에 3개 모드 자동 등록 |
 | **`2`** | **`2_게임실행.bat`** | **게임 바로 실행** | 로컬 설치 파일(`Hans.exe`) 또는 Steam URL 프로토콜(`steam://rungameid/2616420`)로 즉시 구동 |
 | **`3`** | **`3_모드연결해제.bat`** | **모드 안전 제거** | 원본 프로젝트 파일은 그대로 보존하고 게임 폴더 내 링크 및 `mods.txt` 항목만 안전하게 제거 |
+| **`4`** | **`4_스킨_업적_즉시해금.bat`** | **스킨 & 업적 즉시 해금** | 기존 세이브 백업 후 45개 스킨과 23개 업적을 즉시 주입 (오프라인/게임 미실행 상태 지원) |
 
 > [!TIP]
 > **Hot-Sync (무복사 실시간 개발) 환경이란?**  
@@ -135,12 +175,13 @@ sequenceDiagram
 
 1. [UE4SS 공식 릴리즈](https://github.com/UE4SS-RE/RE-UE4SS/releases)에서 UE4SS를 다운로드하여 HANS 실행 바이너리 디렉터리에 설치합니다.
    * 설치 경로: `<HANS 설치 경로>\Hans\Binaries\Win64\`
-2. 본 저장소의 `GravityMod` 및 `WindowModeFix` 폴더를 아래 경로에 복사합니다:
+2. 본 저장소의 `GravityMod`, `WindowModeFix`, `UnlockAllMod` 폴더를 아래 경로에 복사합니다:
    * `<HANS 설치 경로>\Hans\Binaries\Win64\ue4ss\Mods\`
 3. `<HANS 설치 경로>\Hans\Binaries\Win64\ue4ss\Mods\mods.txt` 파일을 열고 다음 라인을 추가합니다:
    ```ini
    GravityMod : 1
    WindowModeFix : 1
+   UnlockAllMod : 1
    ```
 4. 게임을 실행합니다.
 
@@ -154,8 +195,10 @@ hans-mods-test/
 ├── 1_모드연결_및_활성화.bat       # Junction 링크 생성 및 mods.txt 자동 등록
 ├── 2_게임실행.bat                # HANS 게임 원클릭 실행 스크립트
 ├── 3_모드연결해제.bat             # Junction 링크 해제 및 mods.txt 복원
+├── 4_스킨_업적_즉시해금.bat       # 세이브 파일 즉시 해금 원클릭 배치 파일
 ├── setup_mod.ps1                 # 모드 연결 자동화 PowerShell 핵심 로직
 ├── unlink_mod.ps1                # 모드 연결 해제 PowerShell 핵심 로직
+├── unlock_all.ps1                # 스킨 & 업적 세이브 바이너리 패처 PowerShell 스크립트
 ├── README.md                     # 프로젝트 메인 문서 (본 문서)
 │
 ├── GravityMod/                   # [모듈 1] 실시간 중력 제어기
@@ -164,11 +207,17 @@ hans-mods-test/
 │   └── scripts/
 │       └── main.lua              # 중력 조작 및 가디언 루프 구현체
 │
-└── WindowModeFix/                # [모듈 2] 창 모드 버그 픽스
+├── WindowModeFix/                # [모듈 2] 창 모드 버그 픽스
+│   ├── enabled.txt               # 모드 활성화 플래그
+│   ├── README.md                 # WindowModeFix 기술 세부 문서
+│   └── scripts/
+│       └── main.lua              # Kismet/AutoSettings 후킹 구현체
+│
+└── UnlockAllMod/                 # [모듈 3] 모든 스킨 & 업적 해금기
     ├── enabled.txt               # 모드 활성화 플래그
-    ├── README.md                 # WindowModeFix 기술 세부 문서
+    ├── README.md                 # UnlockAllMod 기술 세부 문서
     └── scripts/
-        └── main.lua              # Kismet/AutoSettings 후킹 구현체
+        └── main.lua              # 런타임 UFunction 호출 및 실시간 패치 로직
 ```
 
 ---
@@ -180,6 +229,7 @@ hans-mods-test/
 * **필수 도구:** UE4SS (Unreal Engine 4/5 Scripting System v3.0 이상 권장)
 * **기본 설치 경로:** `H:\steam\steamapps\common\HANS\Hans\Binaries\Win64\ue4ss\Mods`
 * **설정 파일 위치:** `%LOCALAPPDATA%\Hans\Saved\Config\Windows\Settings.ini`
+* **세이브 파일 위치:** `%LOCALAPPDATA%\Hans\Saved\SaveGames\` (`skinslot.sav`, `achslot.sav`)
 
 ---
 
@@ -194,5 +244,13 @@ hans-mods-test/
 - `%LOCALAPPDATA%\Hans\Saved\Config\Windows\Settings.ini` 파일이 읽기 전용으로 설정되어 있지 않은지 확인하세요.
 - `Settings.ini` 내 `r.setres` 항목에 정상적인 해상도(예: `1920x1080w`)가 입력되어 있는지 확인하세요.
 
-**Q3. 모드를 완전히 제거하고 순정 상태로 되돌리고 싶습니다.**
+**Q3. 스킨이 메인 메뉴에서 바로 보이지 않습니다.**
+- `4_스킨_업적_즉시해금.bat`를 실행한 후 게임을 재실행하거나, 인게임에서 `F7`을 누르세요.
+- `%LOCALAPPDATA%\Hans\Saved\SaveGames\skinslot.sav`가 정상적으로 패치되었는지 확인하세요.
+
+**Q4. Steam 업적이 즉시 달성되지 않습니다.**
+- Steam 클라이언트가 로그인된 상태에서 게임을 실행 중이어야 합니다.
+- 인게임에서 `F8` 키를 누르면 `BP_AchievementManager_C`를 통해 Steamworks에 즉시 업적 달성 신호가 전송됩니다.
+
+**Q5. 모드를 완전히 제거하고 순정 상태로 되돌리고 싶습니다.**
 - `3_모드연결해제.bat`를 실행하면 게임 폴더의 링크와 `mods.txt` 설정이 원상태로 깨끗이 복원됩니다.

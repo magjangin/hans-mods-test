@@ -1,7 +1,7 @@
-﻿$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
 $gameModsDir = "H:\steam\steamapps\common\HANS\Hans\Binaries\Win64\ue4ss\Mods"
-$modNames = @("GravityMod", "WindowModeFix")
+$modNames = @("GravityMod", "WindowModeFix", "UnlockAllMod")
 $modsTxt = Join-Path $gameModsDir "mods.txt"
 
 Write-Host "========================================================" -ForegroundColor Cyan
