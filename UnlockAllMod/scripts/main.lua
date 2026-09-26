@@ -62,9 +62,12 @@ local function PatchBoolMapSave(save)
     local tag = FString("MapProperty") .. string.pack("<i4 i4", #value, 0)
         .. FString("ByteProperty") .. FString("BoolProperty") .. "\0"
 
+    local newData = data:sub(1, nameStart - 1) .. save.propertyName .. "\0" .. tag .. value .. rest
+    if newData == data then return true end -- already fully unlocked
+
     local outFile = io.open(filePath, "wb")
     if not outFile then return false end
-    outFile:write(data:sub(1, nameStart - 1), save.propertyName, "\0", tag, value, rest)
+    outFile:write(newData)
     outFile:close()
     return true
 end
@@ -72,11 +75,15 @@ end
 -- -----------------------------------------------------------------------------
 -- Steamworks Direct API Bridge
 -- -----------------------------------------------------------------------------
+-- This mod's folder, taken from the path UE4SS loaded this script from
+-- ("@...\Mods\UnlockAllMod\Scripts\main.lua"; UE4SS capitalises "Scripts")
+local ModDir = debug.getinfo(1, "S").source:match("^@(.+)[\\/][^\\/]+[\\/][^\\/]+$")
+local SteamScript = ModDir and (ModDir .. "\\unlock_steam_achievements.py")
+
 local function TriggerSteamAchievementsDirectly()
-    local scriptDir = os.getenv("HANS_MODS_DIR") or "H:\\ue4ss mod test\\hans mods test"
-    local pythonScript = scriptDir .. "\\unlock_steam_achievements.py"
+    if not SteamScript then return end
     pcall(function()
-        os.execute('start /b "" python "' .. pythonScript .. '"')
+        os.execute('start /b "" python "' .. SteamScript .. '"')
     end)
 end
 
@@ -111,16 +118,27 @@ local function UnlockAllSkinsOnGameThread(isManual)
     print(string.format("[UnlockAllMod] [%s] 45종 모든 스킨 해금 완료!", SourceLabel(isManual)))
 end
 
+-- Lowest stat values that satisfy every stat-based achievement
+local ACHIEVEMENT_STAT_TARGETS = {
+    StatJump = 5000,
+    StatHans = 200,
+    StatChest = 45,
+    StatRestart = 100,
+    StatTrashcan = 10,
+    StatMaxZ = 100000.0,
+}
+
 local function MaxOutStats()
     local statMgr = FindManager("BP_StatManager_C")
     if not statMgr then return end
 
-    statMgr.StatJump = 5000
-    statMgr.StatHans = 200
-    statMgr.StatChest = 45
-    statMgr.StatRestart = 100
-    statMgr.StatTrashcan = 10
-    statMgr.StatMaxZ = 100000.0
+    -- Only raise stats: the game saves them, so lowering a real value would lose the player's progress
+    for stat, target in pairs(ACHIEVEMENT_STAT_TARGETS) do
+        local current = tonumber(statMgr[stat]) or 0
+        if current < target then
+            statMgr[stat] = target
+        end
+    end
     for s = 0, 10 do
         pcall(function() statMgr:CheckForAchievements(s) end)
     end
@@ -206,4 +224,5 @@ BindKeys({ Key.F7, Key.NUM_SEVEN }, function() UnlockAllSkins(true) end)
 BindKeys({ Key.F8, Key.NUM_EIGHT }, function() UnlockAllAchievements(true) end)
 BindKeys({ Key.F9, Key.NUM_NINE }, function() UnlockEverything(true) end)
 
+print(string.format("[UnlockAllMod] Steam 연동 스크립트: %s", SteamScript or "(모드 경로를 찾지 못해 건너뜀)"))
 print("[UnlockAllMod] 로드 완료 (로그 스팸 방지 및 Steam 연동 최적화 적용)")

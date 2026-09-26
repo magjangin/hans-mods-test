@@ -57,6 +57,7 @@ UE4SS(Unreal Engine 4/5 Scripting System) Lua API와 바이너리 세이브 엔�
 UnlockAllMod/
 ├── enabled.txt          # UE4SS 모드 활성화 플래그
 ├── README.md            # 본 모듈 설명서
+├── unlock_steam_achievements.py  # Steam 도전과제 직접 달성 (모드가 자기 폴더 기준으로 찾아 실행)
 └── scripts/
     └── main.lua         # Lua 런타임 언락 및 바이너리 패처 구현체
 ```

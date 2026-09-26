@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "config.ps1")
 
 Write-Banner "HANS UE4SS 모드 연결 및 활성화"
@@ -19,9 +19,18 @@ foreach ($modName in $ModNames) {
         continue
     }
 
-    if (Test-Path $targetLink) {
+    # -Force: 대상이 사라진 Junction도 찾는다
+    $existing = Get-Item $targetLink -Force -ErrorAction SilentlyContinue
+    if ($existing -and $existing.LinkType -ne "Junction") {
+        Write-Host "[경고] $targetLink 은(는) 링크가 아닌 실제 폴더라 이 저장소의 코드가 반영되지 않습니다. 옮기거나 지운 뒤 다시 실행하세요." -ForegroundColor Yellow
+    } elseif ($existing -and (Get-JunctionTarget $existing) -eq (Get-NormalizedPath $srcDir)) {
         Write-Host "[확인] 이미 게임 폴더에 $modName 링크가 연결되어 있습니다." -ForegroundColor Green
     } else {
+        if ($existing) {
+            # 저장소를 옮기거나 이름을 바꾸면 예전 위치를 가리키는 링크가 남는다
+            Write-Host "[교체] $modName 링크가 다른 위치($(Get-JunctionTarget $existing))를 가리키고 있어 다시 연결합니다." -ForegroundColor Yellow
+            $existing.Delete()
+        }
         New-Item -ItemType Junction -Path $targetLink -Target $srcDir | Out-Null
         Write-Host "[성공] $modName Junction 링크 생성 완료 -> $targetLink" -ForegroundColor Green
     }

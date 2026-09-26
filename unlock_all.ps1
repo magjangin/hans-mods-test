@@ -1,4 +1,4 @@
-# ==============================================================================
+﻿# ==============================================================================
 # HANS - All Skins & Achievements Unlocker (PowerShell)
 # 45종 모든 스킨 및 23종 모든 업적을 세이브 파일에 해금 주입합니다.
 # ==============================================================================
@@ -35,10 +35,6 @@ function Unlock-BoolMapSave {
         Write-Host "[안내] $FilePath 파일이 아직 없습니다. 게임을 먼저 1회 실행하거나 기본 세이브 생성이 필요합니다." -ForegroundColor Yellow
         return $false
     }
-
-    $bakPath = $FilePath + ".bak"
-    Copy-Item -Path $FilePath -Destination $bakPath -Force
-    Write-Host "[백업] 기존 $Label 세이브 백업 완료 -> $bakPath" -ForegroundColor DarkGray
 
     $bytes = [System.IO.File]::ReadAllBytes($FilePath)
 
@@ -90,6 +86,16 @@ function Unlock-BoolMapSave {
     $finalBytes = $out.ToArray()
     $writer.Close()
 
+    # 이미 전부 해금된 파일은 다시 쓰지 않는다 (그래야 .bak이 마지막으로 바꾸기 전 상태로 남는다)
+    if ([Convert]::ToBase64String($finalBytes) -eq [Convert]::ToBase64String($bytes)) {
+        Write-Host "[확인] $Label ${Count}개가 이미 모두 해금되어 있습니다. (변경 없음)" -ForegroundColor Green
+        return $true
+    }
+
+    $bakPath = $FilePath + ".bak"
+    Copy-Item -Path $FilePath -Destination $bakPath -Force
+    Write-Host "[백업] 기존 $Label 세이브 백업 완료 -> $bakPath" -ForegroundColor DarkGray
+
     [System.IO.File]::WriteAllBytes($FilePath, $finalBytes)
     Write-Host "[성공] ${Count}개 모든 ${Label}(0~$($Count - 1)) 해금 주입 완료! (크기: $($finalBytes.Length) bytes)" -ForegroundColor Green
     return $true
@@ -109,7 +115,7 @@ Unlock-BoolMapSave -FilePath (Join-Path $SaveDir "achslot.sav") -PropertyName "A
 
 Write-Host ""
 Write-Host "[3/3] Steam 도전과제(Achievements) 직접 연동 중..." -ForegroundColor White
-$steamScript = Join-Path $PSScriptRoot "unlock_steam_achievements.py"
+$steamScript = Join-Path $PSScriptRoot "UnlockAllMod\unlock_steam_achievements.py"
 if (Test-Path $steamScript) {
     try {
         & python $steamScript

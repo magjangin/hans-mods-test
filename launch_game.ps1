@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "config.ps1")
 
 Write-Banner "HANS 게임 실행 스크립트"

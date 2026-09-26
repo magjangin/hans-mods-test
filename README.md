@@ -199,7 +199,6 @@ hans-mods-test/
 ├── unlink_mod.ps1                # 모드 연결 해제 PowerShell 핵심 로직
 ├── launch_game.ps1               # 세이브 패치 후 게임 실행
 ├── unlock_all.ps1                # 스킨 & 업적 세이브 바이너리 패처 PowerShell 스크립트
-├── unlock_steam_achievements.py  # steam_api64.dll로 Steam 도전과제 직접 달성 (자체 GAME_DIR 상수 사용)
 ├── README.md                     # 프로젝트 메인 문서 (본 문서)
 │
 ├── GravityMod/                   # [모듈 1] 실시간 중력 제어기
@@ -217,6 +216,7 @@ hans-mods-test/
 └── UnlockAllMod/                 # [모듈 3] 모든 스킨 & 업적 해금기
     ├── enabled.txt               # 모드 활성화 플래그
     ├── README.md                 # UnlockAllMod 기술 세부 문서
+    ├── unlock_steam_achievements.py  # steam_api64.dll로 Steam 도전과제 직접 달성 (자체 GAME_DIR 상수 사용)
     └── scripts/
         └── main.lua              # 런타임 UFunction 호출 및 실시간 패치 로직
 ```

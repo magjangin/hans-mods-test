@@ -153,9 +153,14 @@ local function ApplyGravity(mode)
     DriftReported = false
 
     ExecuteInGameThread(function()
-        CaptureOriginalsOnce()
+        -- Without the player we cannot capture the originals yet. Changing the world now would let the
+        -- later capture record the modded gravity as "original", so the maintain loop applies it instead.
+        if not CaptureOriginalsOnce() then
+            print(string.format("[GravityMod] [Wait] Player not spawned yet; [%s] will be applied once it spawns", mode.name))
+            return
+        end
 
-        local targetGravityZ = OriginalGravityZ() * mode.scale
+        local targetGravityZ = OriginalWorldGravityZ * mode.scale
 
         print("\n[GravityMod] ========================================")
         print(string.format("[GravityMod] Mode: [%s]", mode.name))

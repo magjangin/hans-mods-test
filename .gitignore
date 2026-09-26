@@ -27,3 +27,6 @@ CrashDump/
 *.swp
 *.bak
 *~
+
+# Python
+__pycache__/
