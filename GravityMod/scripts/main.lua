@@ -10,6 +10,22 @@ print("==================================================")
 -- or the project DefaultGravityZ on each call in standalone, so writing WorldGravityZ alone does not
 -- stick. The mode multiplier is applied once, through GlobalGravityZ, and GravityScale is left to the game.
 
+local DEFAULT_GRAVITY_Z = -980.0
+
+-- scale: multiplier relative to the original world gravity
+-- launchZ: vertical velocity forced on the player right after switching (nil = keep current velocity)
+local GravityModes = {
+    { keys = { Key.F2, Key.NUM_TWO },   keyLabel = "[F2] / [Num 2]", scale = 0.25, name = "저중력 (Low 0.25x)" },
+    { keys = { Key.F3, Key.NUM_THREE }, keyLabel = "[F3] / [Num 3]", scale = 0.08, name = "달 중력 (Moon 0.08x)" },
+    -- Zero gravity: cancel vertical speed so the player floats instead of drifting down forever
+    { keys = { Key.F4, Key.NUM_FOUR },  keyLabel = "[F4] / [Num 4]", scale = 0.0,  name = "무중력 (Zero 0.0x)", launchZ = 0 },
+    -- Floating: lift the player up, then drift down slowly
+    { keys = { Key.F5, Key.NUM_FIVE },  keyLabel = "[F5] / [Num 5]", scale = 0.05, name = "공중 부유 (Floating 0.05x)", launchZ = 750 },
+}
+
+local THRUST_Z = 400          -- Up Arrow impulse in (near) zero gravity
+local THRUST_MAX_SCALE = 0.1  -- Up Arrow only works at or below this gravity scale
+
 -- Captured original physics parameters from the game
 local HasCapturedOriginals = false
 local OriginalWorldGravityZ = nil
@@ -31,6 +47,10 @@ local function GetPlayerMovement(player)
     return nil
 end
 
+local function OriginalGravityZ()
+    return OriginalWorldGravityZ or DEFAULT_GRAVITY_Z
+end
+
 --- Capture original untouched physics parameters from the game
 ---@return boolean true if successfully captured
 local function CaptureOriginalsOnce()
@@ -42,7 +62,7 @@ local function CaptureOriginalsOnce()
 
     if worldSettings:IsValid() and movement then
         -- WorldGravityZ is a transient cache; it can still be 0 if nothing has queried gravity yet
-        OriginalWorldGravityZ = (worldSettings.WorldGravityZ ~= 0.0) and worldSettings.WorldGravityZ or -980.0
+        OriginalWorldGravityZ = (worldSettings.WorldGravityZ ~= 0.0) and worldSettings.WorldGravityZ or DEFAULT_GRAVITY_Z
         OriginalGlobalGravityZ = worldSettings.GlobalGravityZ
         OriginalGlobalGravitySet = worldSettings.bGlobalGravitySet or false
         OriginalGravityScale = movement.GravityScale
@@ -67,6 +87,16 @@ local function SetWorldGravity(worldSettings, globalGravityZ, globalGravitySet, 
     worldSettings.WorldGravityZ = worldGravityZ
 end
 
+--- Set the player's vertical velocity (adds to it when overrideZ is false). Game thread only.
+local function LaunchPlayerUp(z, overrideZ)
+    local player = UEHelpers.GetPlayer()
+    if player:IsValid() and player.LaunchCharacter then
+        player:LaunchCharacter({X = 0, Y = 0, Z = z}, false, overrideZ)
+        return true
+    end
+    return false
+end
+
 --- Print the gravity the player's CharacterMovement actually uses right now
 local function ReportEffectiveGravity(tag)
     local player = UEHelpers.GetPlayer()
@@ -77,7 +107,7 @@ local function ReportEffectiveGravity(tag)
     end
 
     local effective = movement:GetGravityZ()
-    local originalEffective = (OriginalWorldGravityZ or -980.0) * OriginalGravityScale
+    local originalEffective = OriginalGravityZ() * OriginalGravityScale
     local ratio = (originalEffective ~= 0.0) and (effective / originalEffective) or 0.0
     print(string.format("[GravityMod] [%s] %s -> Effective gravity: %.1f (%.3fx of original %.1f, expected %.3fx)",
         tag, CurrentModeName, effective, ratio, originalEffective, ForceMaintainGravity and CurrentGravityScale or 1.0))
@@ -116,23 +146,21 @@ local function RestoreOriginals()
 end
 
 --- Apply gravity as a multiple of the original world gravity
----@param scale number Multiplier relative to original gravity (0.0 to 1.0)
----@param modeName string Mode description
-local function ApplyGravity(scale, modeName)
-    CurrentGravityScale = scale
-    CurrentModeName = modeName
+local function ApplyGravity(mode)
+    CurrentGravityScale = mode.scale
+    CurrentModeName = mode.name
     ForceMaintainGravity = true
     DriftReported = false
 
     ExecuteInGameThread(function()
         CaptureOriginalsOnce()
 
-        local targetGravityZ = (OriginalWorldGravityZ or -980.0) * scale
+        local targetGravityZ = OriginalGravityZ() * mode.scale
 
         print("\n[GravityMod] ========================================")
-        print(string.format("[GravityMod] Mode: [%s]", modeName))
+        print(string.format("[GravityMod] Mode: [%s]", mode.name))
         print(string.format("[GravityMod] Scale: %.2fx | GlobalGravityZ: %.1f | GravityScale kept at game value",
-            scale, targetGravityZ))
+            mode.scale, targetGravityZ))
 
         local worldSettings = UEHelpers.GetWorldSettings()
         if worldSettings:IsValid() then
@@ -141,12 +169,8 @@ local function ApplyGravity(scale, modeName)
             print("[GravityMod] [Warn] WorldSettings not found.")
         end
 
-        -- Zero gravity: cancel vertical speed so the player floats instead of drifting down forever
-        if scale == 0.0 then
-            local player = UEHelpers.GetPlayer()
-            if player:IsValid() and player.LaunchCharacter then
-                player:LaunchCharacter({X = 0, Y = 0, Z = 0}, false, true)
-            end
+        if mode.launchZ and LaunchPlayerUp(mode.launchZ, true) then
+            print(string.format("[GravityMod] [Launch] Vertical velocity set to %.0f", mode.launchZ))
         end
 
         print("[GravityMod] ========================================\n")
@@ -154,15 +178,23 @@ local function ApplyGravity(scale, modeName)
     VerifyAfterDelay()
 end
 
---- Upward float impulse for Floating mode
-local function TriggerFloatUp()
-    ExecuteInGameThread(function()
-        local player = UEHelpers.GetPlayer()
-        if player:IsValid() and player.LaunchCharacter then
-            player:LaunchCharacter({X = 0, Y = 0, Z = 750}, false, true)
-            print("[GravityMod] [Float] Launching character upward into float state!\n")
-        end
-    end)
+local function PrintStatus()
+    local worldSettings = UEHelpers.GetWorldSettings()
+    local player = UEHelpers.GetPlayer()
+    print("\n[GravityMod] Current Status:")
+    print(string.format("  Mode: %s (ForceMaintain: %s)", CurrentModeName, tostring(ForceMaintainGravity)))
+    if worldSettings:IsValid() then
+        print(string.format("  WorldSettings.WorldGravityZ:  %.1f", worldSettings.WorldGravityZ))
+        print(string.format("  WorldSettings.GlobalGravityZ: %.1f (bGlobalGravitySet=%s)",
+            worldSettings.GlobalGravityZ, tostring(worldSettings.bGlobalGravitySet)))
+    end
+    local movement = GetPlayerMovement(player)
+    if movement then
+        print(string.format("  CharacterMovement.GravityScale:  %.2f", movement.GravityScale))
+        print(string.format("  CharacterMovement.GetGravityZ(): %.1f  <- actual gravity on the player", movement:GetGravityZ()))
+        print(string.format("  CharacterMovement.JumpZVelocity: %.1f", movement.JumpZVelocity))
+    end
+    print("======================================\n")
 end
 
 -- Capture originals once the player spawns, and keep the selected gravity applied
@@ -191,70 +223,32 @@ LoopAsync(250, function()
 end)
 
 -- Keybindings
--- F1 / Num 1: Restore Original Values
-RegisterKeyBind(Key.F1, RestoreOriginals)
-RegisterKeyBind(Key.NUM_ONE, RestoreOriginals)
+local function BindKeys(keys, callback)
+    for _, key in ipairs(keys) do
+        RegisterKeyBind(key, callback)
+    end
+end
 
--- F2 / Num 2: Low Gravity (0.25x)
-RegisterKeyBind(Key.F2, function() ApplyGravity(0.25, "저중력 (Low 0.25x)") end)
-RegisterKeyBind(Key.NUM_TWO, function() ApplyGravity(0.25, "저중력 (Low 0.25x)") end)
+BindKeys({ Key.F1, Key.NUM_ONE }, RestoreOriginals)
 
--- F3 / Num 3: Moon Gravity (0.08x)
-RegisterKeyBind(Key.F3, function() ApplyGravity(0.08, "달 중력 (Moon 0.08x)") end)
-RegisterKeyBind(Key.NUM_THREE, function() ApplyGravity(0.08, "달 중력 (Moon 0.08x)") end)
+for _, mode in ipairs(GravityModes) do
+    BindKeys(mode.keys, function() ApplyGravity(mode) end)
+end
 
--- F4 / Num 4: Zero Gravity (0.0x)
-RegisterKeyBind(Key.F4, function() ApplyGravity(0.0, "무중력 (Zero 0.0x)") end)
-RegisterKeyBind(Key.NUM_FOUR, function() ApplyGravity(0.0, "무중력 (Zero 0.0x)") end)
-
--- F5 / Num 5: Float / Lift Up
-RegisterKeyBind(Key.F5, function()
-    ApplyGravity(0.05, "공중 부유 (Floating 0.05x)")
-    TriggerFloatUp()
-end)
-RegisterKeyBind(Key.NUM_FIVE, function()
-    ApplyGravity(0.05, "공중 부유 (Floating 0.05x)")
-    TriggerFloatUp()
-end)
-
--- Up Arrow: Upward thrust in Zero Gravity
+-- Up Arrow: Upward thrust in (near) zero gravity
 RegisterKeyBind(Key.UP_ARROW, function()
-    if ForceMaintainGravity and CurrentGravityScale <= 0.1 then
-        ExecuteInGameThread(function()
-            local player = UEHelpers.GetPlayer()
-            if player:IsValid() and player.LaunchCharacter then
-                player:LaunchCharacter({X = 0, Y = 0, Z = 400}, false, false)
-            end
-        end)
+    if ForceMaintainGravity and CurrentGravityScale <= THRUST_MAX_SCALE then
+        ExecuteInGameThread(function() LaunchPlayerUp(THRUST_Z, false) end)
     end
 end)
 
--- F6: Print Current Status
 RegisterKeyBind(Key.F6, function()
-    ExecuteInGameThread(function()
-        local worldSettings = UEHelpers.GetWorldSettings()
-        local player = UEHelpers.GetPlayer()
-        print("\n[GravityMod] Current Status:")
-        print(string.format("  Mode: %s (ForceMaintain: %s)", CurrentModeName, tostring(ForceMaintainGravity)))
-        if worldSettings:IsValid() then
-            print(string.format("  WorldSettings.WorldGravityZ:  %.1f", worldSettings.WorldGravityZ))
-            print(string.format("  WorldSettings.GlobalGravityZ: %.1f (bGlobalGravitySet=%s)",
-                worldSettings.GlobalGravityZ, tostring(worldSettings.bGlobalGravitySet)))
-        end
-        local movement = GetPlayerMovement(player)
-        if movement then
-            print(string.format("  CharacterMovement.GravityScale:  %.2f", movement.GravityScale))
-            print(string.format("  CharacterMovement.GetGravityZ(): %.1f  <- actual gravity on the player", movement:GetGravityZ()))
-            print(string.format("  CharacterMovement.JumpZVelocity: %.1f", movement.JumpZVelocity))
-        end
-        print("======================================\n")
-    end)
+    ExecuteInGameThread(PrintStatus)
 end)
 
 print("[GravityMod] Loaded! 단축키:")
 print("  - [F1] / [Num 1]: 원래 값으로 완전 복구 (Restore Original Defaults)")
-print("  - [F2] / [Num 2]: 저중력 (0.25x)")
-print("  - [F3] / [Num 3]: 달 중력 (0.08x)")
-print("  - [F4] / [Num 4]: 완전 무중력 (0.0x)")
-print("  - [F5] / [Num 5]: 공중 부유 (Lift & Float, 0.05x)")
+for _, mode in ipairs(GravityModes) do
+    print(string.format("  - %s: %s", mode.keyLabel, mode.name))
+end
 print("  - [F6]        : 현재 중력/물리 파라미터 상태 콘솔 출력")

@@ -1,23 +1,18 @@
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "config.ps1")
 
-$gameModsDir = "H:\steam\steamapps\common\HANS\Hans\Binaries\Win64\ue4ss\Mods"
-$modNames = @("GravityMod", "WindowModeFix", "UnlockAllMod")
-$modsTxt = Join-Path $gameModsDir "mods.txt"
+Write-Banner "HANS UE4SS 모드 연결 및 활성화"
 
-Write-Host "========================================================" -ForegroundColor Cyan
-Write-Host "  HANS UE4SS 모드 연결 및 활성화" -ForegroundColor Cyan
-Write-Host "========================================================" -ForegroundColor Cyan
-
-if (-not (Test-Path $gameModsDir)) {
-    Write-Host "[오류] UE4SS Mods 폴더를 찾을 수 없습니다: $gameModsDir" -ForegroundColor Red
+if (-not (Test-Path $GameModsDir)) {
+    Write-Host "[오류] UE4SS Mods 폴더를 찾을 수 없습니다: $GameModsDir" -ForegroundColor Red
     return
 }
 
-# 1. 각 모드 폴더를 심볼릭 링크(Junction)로 연결
+# 1. 각 모드 폴더를 Junction으로 연결
 $linked = @()
-foreach ($modName in $modNames) {
+foreach ($modName in $ModNames) {
     $srcDir = Join-Path $PSScriptRoot $modName
-    $targetLink = Join-Path $gameModsDir $modName
+    $targetLink = Join-Path $GameModsDir $modName
 
     if (-not (Test-Path $srcDir)) {
         Write-Host "[건너뜀] 소스 모드 폴더가 없습니다: $srcDir" -ForegroundColor Yellow
@@ -34,13 +29,12 @@ foreach ($modName in $modNames) {
 }
 
 # 2. mods.txt 등록
-if ((Test-Path $modsTxt) -and ($linked.Count -gt 0)) {
-    $lines = @(Get-Content $modsTxt)
+if ((Test-Path $ModsTxt) -and ($linked.Count -gt 0)) {
+    $lines = @(Get-Content $ModsTxt)
     $added = @()
 
     foreach ($modName in $linked) {
-        $pattern = "^\s*" + [regex]::Escape($modName) + "\s*:"
-        if ($lines -match $pattern) {
+        if ($lines -match (Get-ModsTxtPattern $modName)) {
             Write-Host "[확인] mods.txt에 이미 $modName 항목이 등록되어 있습니다." -ForegroundColor Yellow
         } else {
             $added += "$modName : 1"
@@ -49,7 +43,7 @@ if ((Test-Path $modsTxt) -and ($linked.Count -gt 0)) {
 
     if ($added.Count -gt 0) {
         # 'Built-in keybinds' 주석 아래 항목은 항상 맨 끝에 있어야 하므로 그 앞에 삽입한다
-        $insertAt = -1
+        $insertAt = $lines.Count
         for ($i = 0; $i -lt $lines.Count; $i++) {
             if ($lines[$i] -match "^\s*;\s*Built-in keybinds") {
                 $insertAt = $i
@@ -57,27 +51,17 @@ if ((Test-Path $modsTxt) -and ($linked.Count -gt 0)) {
             }
         }
 
-        if ($insertAt -gt 0) {
-            $newLines = @($lines[0..($insertAt - 1)]) + $added + @($lines[$insertAt..($lines.Count - 1)])
-        } elseif ($insertAt -eq 0) {
-            $newLines = $added + $lines
-        } else {
-            $newLines = $lines + $added
-        }
-
-        Set-Content -Path $modsTxt -Value $newLines
+        $newLines = @($lines | Select-Object -First $insertAt) + $added + @($lines | Select-Object -Skip $insertAt)
+        Set-Content -Path $ModsTxt -Value $newLines
         foreach ($entry in $added) {
             Write-Host "[성공] mods.txt에 '$entry' 추가 완료!" -ForegroundColor Green
         }
     }
 }
 
-# 3. 모든 스킨 & 업적 세이브 선제적 자동 패치
-$unlockScript = Join-Path $PSScriptRoot "unlock_all.ps1"
-if (Test-Path $unlockScript) {
-    Write-Host ""
-    & $unlockScript
-}
+# 3. 모든 스킨 & 업적 세이브 선제 패치
+Write-Host ""
+& (Join-Path $PSScriptRoot "unlock_all.ps1")
 
 Write-Host ""
 Write-Host "========================================================" -ForegroundColor Cyan

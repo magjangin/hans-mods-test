@@ -1,5 +1,3 @@
-local UEHelpers = require("UEHelpers")
-
 print("==================================================")
 print("[UnlockAllMod] Hans Skin & Achievement Auto-Unlocker Loading...")
 print("==================================================")
@@ -7,108 +5,68 @@ print("==================================================")
 local NUM_SKINS = 45        -- E_Skins::Type 0..44 (45 skins)
 local NUM_ACHIEVEMENTS = 23 -- EAchievements::Type 0..22 (23 achievements)
 
--- Helper: Pack 32-bit little-endian integer to 4 bytes
-local function PackI32(n)
-    return string.char(
-        n % 256,
-        math.floor(n / 256) % 256,
-        math.floor(n / 65536) % 256,
-        math.floor(n / 16777216) % 256
-    )
-end
-
--- Helper: Pack 64-bit little-endian integer to 8 bytes
-local function PackI64(n)
-    return PackI32(n) .. "\0\0\0\0"
-end
+local SKIN_SAVE = {
+    fileName = "skinslot.sav",
+    propertyName = "SavedSkins",
+    enumPrefix = "E_Skins::NewEnumerator",
+    count = NUM_SKINS,
+}
+local ACHIEVEMENT_SAVE = {
+    fileName = "achslot.sav",
+    propertyName = "Achievements",
+    enumPrefix = "EAchievements::NewEnumerator",
+    count = NUM_ACHIEVEMENTS,
+}
 
 -- -----------------------------------------------------------------------------
 -- SaveGame Direct File Patcher
 -- -----------------------------------------------------------------------------
-local function PatchSkinsSave()
-    local localAppData = os.getenv("LOCALAPPDATA")
-    if not localAppData then return false end
-    local filePath = localAppData .. "\\Hans\\Saved\\SaveGames\\skinslot.sav"
+-- GVAS FString: int32 length (including the null terminator), bytes, null terminator
+local FSTRING = "<s4"
+-- Map tag after the property name: type, size, array index, key type, value type, has-guid flag
+local MAP_TAG = "<s4 i4 i4 s4 s4 B"
 
-    local file = io.open(filePath, "rb")
-    if not file then return false end
-    local data = file:read("*a")
-    file:close()
-
-    local searchTag = "SavedSkins\0"
-    local idx = string.find(data, searchTag, 1, true)
-    if not idx then return false end
-
-    local prefix = string.sub(data, 1, idx - 1)
-
-    local entries = {}
-    for i = 0, NUM_SKINS - 1 do
-        local name = "E_Skins::NewEnumerator" .. tostring(i) .. "\0"
-        table.insert(entries, PackI32(#name) .. name .. "\1")
-    end
-    local entriesData = table.concat(entries)
-    local payload = PackI32(0) .. PackI32(NUM_SKINS) .. entriesData
-
-    local propName = "SavedSkins\0"
-    local propType = PackI32(12) .. "MapProperty\0"
-    local propSize = PackI64(#payload)
-    local keyType = PackI32(13) .. "ByteProperty\0"
-    local valType = PackI32(13) .. "BoolProperty\0"
-    local tag = "\0"
-    local trailer = PackI32(5) .. "None\0\0\0\0\0"
-
-    local newContent = prefix .. propName .. propType .. propSize .. keyType .. valType .. tag .. payload .. trailer
-
-    local outFile = io.open(filePath, "wb")
-    if outFile then
-        outFile:write(newContent)
-        outFile:close()
-        return true
-    end
-    return false
+local function FString(s)
+    return string.pack(FSTRING, s .. "\0")
 end
 
-local function PatchAchievementsSave()
+--- Rewrite a TMap<Enum, bool> property so that every enumerator is true.
+--- Properties stored after the map (e.g. SelectedMesh in skinslot.sav) are kept.
+---@return boolean true if the file was rewritten
+local function PatchBoolMapSave(save)
     local localAppData = os.getenv("LOCALAPPDATA")
     if not localAppData then return false end
-    local filePath = localAppData .. "\\Hans\\Saved\\SaveGames\\achslot.sav"
+    local filePath = localAppData .. "\\Hans\\Saved\\SaveGames\\" .. save.fileName
 
     local file = io.open(filePath, "rb")
     if not file then return false end
     local data = file:read("*a")
     file:close()
 
-    local searchTag = "Achievements\0"
-    local idx = string.find(data, searchTag, 1, true)
-    if not idx then return false end
+    -- The int32 length before the name stays in the prefix; everything from the name on is rewritten
+    local nameStart = data:find(save.propertyName .. "\0", 1, true)
+    if not nameStart then return false end
 
-    local prefix = string.sub(data, 1, idx - 1)
+    local ok, _, oldSize, _, _, _, hasGuid, valueStart =
+        pcall(string.unpack, MAP_TAG, data, nameStart + #save.propertyName + 1)
+    if not ok then return false end
+    if hasGuid ~= 0 then valueStart = valueStart + 16 end
+    local rest = data:sub(valueStart + oldSize)
 
     local entries = {}
-    for i = 0, NUM_ACHIEVEMENTS - 1 do
-        local name = "EAchievements::NewEnumerator" .. tostring(i) .. "\0"
-        table.insert(entries, PackI32(#name) .. name .. "\1")
+    for i = 0, save.count - 1 do
+        entries[#entries + 1] = FString(save.enumPrefix .. i) .. "\1"
     end
-    local entriesData = table.concat(entries)
-    local payload = PackI32(0) .. PackI32(NUM_ACHIEVEMENTS) .. entriesData
-
-    local propName = "Achievements\0"
-    local propType = PackI32(12) .. "MapProperty\0"
-    local propSize = PackI64(#payload)
-    local keyType = PackI32(13) .. "ByteProperty\0"
-    local valType = PackI32(13) .. "BoolProperty\0"
-    local tag = "\0"
-    local trailer = PackI32(5) .. "None\0\0\0\0\0"
-
-    local newContent = prefix .. propName .. propType .. propSize .. keyType .. valType .. tag .. payload .. trailer
+    -- NumKeysToRemove, NumEntries, entries
+    local value = string.pack("<i4 i4", 0, save.count) .. table.concat(entries)
+    local tag = FString("MapProperty") .. string.pack("<i4 i4", #value, 0)
+        .. FString("ByteProperty") .. FString("BoolProperty") .. "\0"
 
     local outFile = io.open(filePath, "wb")
-    if outFile then
-        outFile:write(newContent)
-        outFile:close()
-        return true
-    end
-    return false
+    if not outFile then return false end
+    outFile:write(data:sub(1, nameStart - 1), save.propertyName, "\0", tag, value, rest)
+    outFile:close()
+    return true
 end
 
 -- -----------------------------------------------------------------------------
@@ -128,73 +86,93 @@ end
 local HasUnlockedSkins = false
 local HasUnlockedAchievements = false
 
-local function UnlockAllSkinsInternal(isManual)
-    PatchSkinsSave()
-
-    ExecuteInGameThread(function()
-        local sm = FindFirstOf("BP_SkinManager_C")
-        if sm and sm:IsValid() then
-            for i = 0, NUM_SKINS - 1 do
-                pcall(function() sm:UnlockASkin(i) end)
-            end
-            HasUnlockedSkins = true
-            print(string.format("[UnlockAllMod] [%s] 45종 모든 스킨 해금 완료!", isManual and "수동" or "자동"))
-        end
-    end)
+local function FindManager(className)
+    local manager = FindFirstOf(className)
+    if manager and manager:IsValid() then return manager end
+    return nil
 end
 
-local function UnlockAllAchievementsInternal(isManual)
+local function SourceLabel(isManual)
+    return isManual and "수동" or "자동"
+end
+
+-- The *OnGameThread functions must run on the game thread; they set the Has* flags synchronously
+-- so a guardian tick queued behind a stalled game thread sees them and does not unlock twice.
+local function UnlockAllSkinsOnGameThread(isManual)
+    PatchBoolMapSave(SKIN_SAVE)
+
+    local sm = FindManager("BP_SkinManager_C")
+    if not sm then return end
+
+    for i = 0, NUM_SKINS - 1 do
+        pcall(function() sm:UnlockASkin(i) end)
+    end
+    HasUnlockedSkins = true
+    print(string.format("[UnlockAllMod] [%s] 45종 모든 스킨 해금 완료!", SourceLabel(isManual)))
+end
+
+local function MaxOutStats()
+    local statMgr = FindManager("BP_StatManager_C")
+    if not statMgr then return end
+
+    statMgr.StatJump = 5000
+    statMgr.StatHans = 200
+    statMgr.StatChest = 45
+    statMgr.StatRestart = 100
+    statMgr.StatTrashcan = 10
+    statMgr.StatMaxZ = 100000.0
+    for s = 0, 10 do
+        pcall(function() statMgr:CheckForAchievements(s) end)
+    end
+end
+
+local function UnlockAllAchievementsOnGameThread(isManual)
     -- Steam API 직접 동기화
     TriggerSteamAchievementsDirectly()
 
-    ExecuteInGameThread(function()
-        local am = FindFirstOf("BP_AchievementManager_C")
-        if am and am:IsValid() then
-            -- 메모리 캐시 비우기 (이미 True로 캐싱되어 스킵되는 현상 방지)
-            if am.Achievements and am.Achievements.Empty then
-                pcall(function() am.Achievements:Empty() end)
-            end
-            if am.SaveAchs and am.SaveAchs:IsValid() and am.SaveAchs.Achievements and am.SaveAchs.Achievements.Empty then
-                pcall(function() am.SaveAchs.Achievements:Empty() end)
-            end
+    local am = FindManager("BP_AchievementManager_C")
+    if not am then return end
 
-            -- 인게임 업적 UFunction 호출 및 BP_Achievement_C 스폰
-            for i = 0, NUM_ACHIEVEMENTS - 1 do
-                pcall(function() am:UnlockAchievement(i) end)
-            end
+    -- 메모리 캐시 비우기 (이미 True로 캐싱되어 스킵되는 현상 방지)
+    if am.Achievements and am.Achievements.Empty then
+        pcall(function() am.Achievements:Empty() end)
+    end
+    if am.SaveAchs and am.SaveAchs:IsValid() and am.SaveAchs.Achievements and am.SaveAchs.Achievements.Empty then
+        pcall(function() am.SaveAchs.Achievements:Empty() end)
+    end
 
-            -- 인게임 스탯 매니저 수치 극대화 트리거
-            local statMgr = FindFirstOf("BP_StatManager_C")
-            if statMgr and statMgr:IsValid() then
-                statMgr.StatJump = 5000
-                statMgr.StatHans = 200
-                statMgr.StatChest = 45
-                statMgr.StatRestart = 100
-                statMgr.StatTrashcan = 10
-                statMgr.StatMaxZ = 100000.0
-                for s = 0, 10 do
-                    pcall(function() statMgr:CheckForAchievements(s) end)
-                end
-            end
+    -- 인게임 업적 UFunction 호출 및 BP_Achievement_C 스폰
+    for i = 0, NUM_ACHIEVEMENTS - 1 do
+        pcall(function() am:UnlockAchievement(i) end)
+    end
 
-            HasUnlockedAchievements = true
-            PatchAchievementsSave()
-            print(string.format("[UnlockAllMod] [%s] 23종 모든 업적 및 Steam 연동 완료!", isManual and "수동" or "자동"))
-        end
-    end)
+    -- 인게임 스탯 매니저 수치 극대화 트리거
+    MaxOutStats()
+
+    HasUnlockedAchievements = true
+    PatchBoolMapSave(ACHIEVEMENT_SAVE)
+    print(string.format("[UnlockAllMod] [%s] 23종 모든 업적 및 Steam 연동 완료!", SourceLabel(isManual)))
+end
+
+local function UnlockAllSkins(isManual)
+    ExecuteInGameThread(function() UnlockAllSkinsOnGameThread(isManual) end)
+end
+
+local function UnlockAllAchievements(isManual)
+    ExecuteInGameThread(function() UnlockAllAchievementsOnGameThread(isManual) end)
 end
 
 local function UnlockEverything(isManual)
-    UnlockAllSkinsInternal(isManual)
-    UnlockAllAchievementsInternal(isManual)
+    UnlockAllSkins(isManual)
+    UnlockAllAchievements(isManual)
 end
 
 -- -----------------------------------------------------------------------------
 -- 백그라운드 가디언 루프 (스팸 완전 제거 및 1회 완료 시 자동 종료)
 -- -----------------------------------------------------------------------------
 -- 1. 모드 로드 시 디스크 세이브 선제적 패치
-PatchSkinsSave()
-PatchAchievementsSave()
+PatchBoolMapSave(SKIN_SAVE)
+PatchBoolMapSave(ACHIEVEMENT_SAVE)
 
 LoopAsync(1000, function()
     -- 둘 다 완료되었으면 루프 완전 종료 (스팸 100% 방지)
@@ -204,18 +182,11 @@ LoopAsync(1000, function()
     end
 
     ExecuteInGameThread(function()
-        if not HasUnlockedSkins then
-            local sm = FindFirstOf("BP_SkinManager_C")
-            if sm and sm:IsValid() then
-                UnlockAllSkinsInternal(false)
-            end
+        if not HasUnlockedSkins and FindManager("BP_SkinManager_C") then
+            UnlockAllSkinsOnGameThread(false)
         end
-
-        if not HasUnlockedAchievements then
-            local am = FindFirstOf("BP_AchievementManager_C")
-            if am and am:IsValid() then
-                UnlockAllAchievementsInternal(false)
-            end
+        if not HasUnlockedAchievements and FindManager("BP_AchievementManager_C") then
+            UnlockAllAchievementsOnGameThread(false)
         end
     end)
 
@@ -225,13 +196,14 @@ end)
 -- -----------------------------------------------------------------------------
 -- 비상 수동 단축키 (필요 시 직접 재호출 가능)
 -- -----------------------------------------------------------------------------
-RegisterKeyBind(Key.F7, function() UnlockAllSkinsInternal(true) end)
-RegisterKeyBind(Key.NUM_SEVEN, function() UnlockAllSkinsInternal(true) end)
+local function BindKeys(keys, callback)
+    for _, key in ipairs(keys) do
+        RegisterKeyBind(key, callback)
+    end
+end
 
-RegisterKeyBind(Key.F8, function() UnlockAllAchievementsInternal(true) end)
-RegisterKeyBind(Key.NUM_EIGHT, function() UnlockAllAchievementsInternal(true) end)
-
-RegisterKeyBind(Key.F9, function() UnlockEverything(true) end)
-RegisterKeyBind(Key.NUM_NINE, function() UnlockEverything(true) end)
+BindKeys({ Key.F7, Key.NUM_SEVEN }, function() UnlockAllSkins(true) end)
+BindKeys({ Key.F8, Key.NUM_EIGHT }, function() UnlockAllAchievements(true) end)
+BindKeys({ Key.F9, Key.NUM_NINE }, function() UnlockEverything(true) end)
 
 print("[UnlockAllMod] 로드 완료 (로그 스팸 방지 및 Steam 연동 최적화 적용)")

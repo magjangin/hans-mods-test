@@ -33,6 +33,7 @@ UE4SS(Unreal Engine 4/5 Scripting System) Lua API와 바이너리 세이브 엔�
 ### 2. GVAS 바이너리 세이브 파일 직접 패치
 * **스킨 세이브:** `%LOCALAPPDATA%\Hans\Saved\SaveGames\skinslot.sav`
   * `MapProperty` 형식의 `SavedSkins` 블록을 45개 열거형(`E_Skins::NewEnumerator0` ~ `44`)과 `true`(`0x01`) 플래그로 덮어씁니다.
+  * 맵 뒤에 저장되는 `SelectedMesh`(현재 장착한 스킨) 등 다른 속성은 그대로 보존합니다. 기존 태그의 크기 필드로 맵 값의 끝을 계산해 그 뒤 바이트를 이어 붙입니다.
 * **업적 세이브:** `%LOCALAPPDATA%\Hans\Saved\SaveGames\achslot.sav`
   * `MapProperty` 형식의 `Achievements` 블록을 23개 열거형(`EAchievements::NewEnumerator0` ~ `22`)과 `true`(`0x01`) 플래그로 덮어씁니다.
 

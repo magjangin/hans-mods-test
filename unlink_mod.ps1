@@ -1,15 +1,10 @@
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "config.ps1")
 
-$gameModsDir = "H:\steam\steamapps\common\HANS\Hans\Binaries\Win64\ue4ss\Mods"
-$modNames = @("GravityMod", "WindowModeFix", "UnlockAllMod")
-$modsTxt = Join-Path $gameModsDir "mods.txt"
+Write-Banner "HANS UE4SS 모드 연결 해제"
 
-Write-Host "========================================================" -ForegroundColor Cyan
-Write-Host "  HANS UE4SS 모드 연결 해제" -ForegroundColor Cyan
-Write-Host "========================================================" -ForegroundColor Cyan
-
-foreach ($modName in $modNames) {
-    $targetLink = Join-Path $gameModsDir $modName
+foreach ($modName in $ModNames) {
+    $targetLink = Join-Path $GameModsDir $modName
 
     if (Test-Path $targetLink) {
         # Remove junction without deleting original content
@@ -21,13 +16,13 @@ foreach ($modName in $modNames) {
 }
 Write-Host "       (작업 폴더의 소스 코드는 그대로 보존됩니다)" -ForegroundColor Gray
 
-if (Test-Path $modsTxt) {
-    $newContent = @(Get-Content $modsTxt)
-    foreach ($modName in $modNames) {
-        $pattern = "^\s*" + [regex]::Escape($modName) + "\s*:"
+if (Test-Path $ModsTxt) {
+    $newContent = @(Get-Content $ModsTxt)
+    foreach ($modName in $ModNames) {
+        $pattern = Get-ModsTxtPattern $modName
         $newContent = @($newContent | Where-Object { $_ -notmatch $pattern })
     }
-    Set-Content -Path $modsTxt -Value $newContent
+    Set-Content -Path $ModsTxt -Value $newContent
     Write-Host "[성공] mods.txt에서 모드 등록 해제 완료." -ForegroundColor Green
 }
 

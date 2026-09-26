@@ -156,7 +156,7 @@ flowchart LR
 | 번호 | 실행 파일 | 설명 | 내부 실행 메커니즘 |
 | :---: | :--- | :--- | :--- |
 | **`1`** | **`1_모드연결_및_활성화.bat`** | **모드 연결 및 활성화** | 게임 UE4SS `Mods` 폴더에 NTFS Junction을 연결하고 `mods.txt`에 3개 모드 자동 등록 |
-| **`2`** | **`2_게임실행.bat`** | **게임 바로 실행** | 로컬 설치 파일(`Hans.exe`) 또는 Steam URL 프로토콜(`steam://rungameid/2616420`)로 즉시 구동 |
+| **`2`** | **`2_게임실행.bat`** | **게임 바로 실행** | 세이브 패치 후 로컬 설치 파일(`Hans.exe`) 또는 Steam URL 프로토콜(`steam://rungameid/2616420`)로 구동 |
 | **`3`** | **`3_모드연결해제.bat`** | **모드 안전 제거** | 원본 프로젝트 파일은 그대로 보존하고 게임 폴더 내 링크 및 `mods.txt` 항목만 안전하게 제거 |
 | **`4`** | **`4_스킨_업적_즉시해금.bat`** | **스킨 & 업적 즉시 해금** | 기존 세이브 백업 후 45개 스킨과 23개 업적을 즉시 주입 (오프라인/게임 미실행 상태 지원) |
 
@@ -194,9 +194,12 @@ hans-mods-test/
 ├── 2_게임실행.bat                # HANS 게임 원클릭 실행 스크립트
 ├── 3_모드연결해제.bat             # Junction 링크 해제 및 mods.txt 복원
 ├── 4_스킨_업적_즉시해금.bat       # 세이브 파일 즉시 해금 원클릭 배치 파일
+├── config.ps1                    # 게임 경로, 모드 목록 등 스크립트 공용 설정 (경로는 여기만 수정)
 ├── setup_mod.ps1                 # 모드 연결 자동화 PowerShell 핵심 로직
 ├── unlink_mod.ps1                # 모드 연결 해제 PowerShell 핵심 로직
+├── launch_game.ps1               # 세이브 패치 후 게임 실행
 ├── unlock_all.ps1                # 스킨 & 업적 세이브 바이너리 패처 PowerShell 스크립트
+├── unlock_steam_achievements.py  # steam_api64.dll로 Steam 도전과제 직접 달성 (자체 GAME_DIR 상수 사용)
 ├── README.md                     # 프로젝트 메인 문서 (본 문서)
 │
 ├── GravityMod/                   # [모듈 1] 실시간 중력 제어기
