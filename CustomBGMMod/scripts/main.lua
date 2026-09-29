@@ -5,6 +5,7 @@ print("[CustomBGMMod] Hans Custom BGM Injector Loading...")
 print("==================================================")
 
 local HWA_DIR = [[H:\steam\steamapps\common\HANS\hwa]]
+local SETTINGS_INI = os.getenv("LOCALAPPDATA") .. "\\Hans\\Saved\\Config\\Windows\\Settings.ini"
 
 -- 1. Ensure target directory exists on game launch
 pcall(function()
@@ -27,20 +28,7 @@ local function SendPlayerCommand(cmd)
     end)
 end
 
--- 3. Launch background player script
-local HasLaunchedPlayer = false
-local function LaunchBGMPlayer()
-    if HasLaunchedPlayer or not PlayerScript then return end
-    HasLaunchedPlayer = true
-    pcall(function()
-        os.execute('start /b "" pythonw "' .. PlayerScript .. '"')
-        print(string.format("[CustomBGMMod] BGM Player process launched. Monitoring: %s", HWA_DIR))
-    end)
-end
-
-LaunchBGMPlayer()
-
--- 4. Check if custom music files exist in HWA_DIR
+-- 3. Check if custom music files exist in HWA_DIR
 local function CheckHasCustomMusic()
     local pipe = io.popen(string.format('dir /b /a-d "%s\\*.ogg" "%s\\*.mp3" "%s\\*.wav" "%s\\*.flac" 2>nul', HWA_DIR, HWA_DIR, HWA_DIR, HWA_DIR))
     if not pipe then return false end
@@ -50,71 +38,67 @@ local function CheckHasCustomMusic()
 end
 
 local HasCustomMusic = CheckHasCustomMusic()
-if HasCustomMusic then
-    print(string.format("[CustomBGMMod] [Active] Custom music found in '%s'! Original BGM will be muted.", HWA_DIR))
-else
-    print(string.format("[CustomBGMMod] [Notice] No custom music (.ogg/.mp3) in '%s'. Original BGM retained.", HWA_DIR))
-    print("[CustomBGMMod] Put any .ogg or .mp3 in that folder to replace in-game music!")
-end
 
--- -----------------------------------------------------------------------------
--- [DEBUG] Audio Component Inspector & Dumper
--- -----------------------------------------------------------------------------
-local function DumpAudioState()
-    print("\n==================== [AUDIO DEBUG DUMP] ====================")
-    local allAudioComps = FindAllOf("AudioComponent") or {}
-    print(string.format("[AudioDebug] Total AudioComponent instances found: %d", #allAudioComps))
+-- 4. Pre-patch Settings.ini (GameAudio.MusicVolume=0) so game loads menu with 0 music volume
+local function PatchSettingsIniMusicVolumeZero()
+    if not HasCustomMusic then return end
+    local file = io.open(SETTINGS_INI, "r")
+    if not file then return end
+    local content = file:read("*a")
+    file:close()
 
-    local count = 0
-    for i, comp in ipairs(allAudioComps) do
-        if comp:IsValid() then
-            local isPlaying = false
-            pcall(function() isPlaying = comp:IsPlaying() end)
-
-            local soundName = "None"
-            pcall(function()
-                if comp.Sound and comp.Sound:IsValid() then
-                    soundName = comp.Sound:GetFullName()
-                end
-            end)
-
-            local ownerName = "None"
-            pcall(function()
-                local owner = comp:GetOwner()
-                if owner and owner:IsValid() then
-                    ownerName = owner:GetFullName()
-                end
-            end)
-
-            local compName = comp:GetFullName()
-            local vol = comp.VolumeMultiplier or -1.0
-
-            if isPlaying or vol > 0.0 or soundName:lower():match("music") or soundName:lower():match("bgm") then
-                count = count + 1
-                print(string.format("[AudioDebug] #%d [Playing=%s, Vol=%.2f]", count, tostring(isPlaying), vol))
-                print(string.format("             Component : %s", compName))
-                print(string.format("             Owner     : %s", ownerName))
-                print(string.format("             Sound     : %s", soundName))
-            end
+    local updated, count = content:gsub("GameAudio%.MusicVolume%s*=%s*[%d%.]+", "GameAudio.MusicVolume=0")
+    if count > 0 and updated ~= content then
+        local outFile = io.open(SETTINGS_INI, "w")
+        if outFile then
+            outFile:write(updated)
+            outFile:close()
+            print("[CustomBGMMod] Settings.ini GameAudio.MusicVolume -> 0 (선제 음소거 패치 완료)")
         end
     end
-
-    -- Check GameInstance music volume state
-    local gi = FindFirstOf("GI_Hans_C")
-    if gi and gi:IsValid() then
-        print(string.format("[AudioDebug] GameInstance (GI_Hans_C) found: %s", gi:GetFullName()))
-    else
-        print("[AudioDebug] GameInstance (GI_Hans_C) NOT found yet.")
-    end
-
-    print("============================================================\n")
 end
 
--- 5. Mute original game BGM components while custom music is active
-local HasAppliedGIMusicMute = false
-local MutedComponentMap = {}
+PatchSettingsIniMusicVolumeZero()
 
-local function MuteGameAudio()
+-- 5. Launch background player script
+local HasLaunchedPlayer = false
+local function LaunchBGMPlayer()
+    if HasLaunchedPlayer or not PlayerScript or not HasCustomMusic then return end
+    HasLaunchedPlayer = true
+    pcall(function()
+        os.execute('start /b "" pythonw "' .. PlayerScript .. '"')
+        print(string.format("[CustomBGMMod] BGM Player process launched. Monitoring: %s", HWA_DIR))
+    end)
+end
+
+LaunchBGMPlayer()
+
+if HasCustomMusic then
+    print(string.format("[CustomBGMMod] [Active] Custom music found in '%s'! Game music will be muted.", HWA_DIR))
+else
+    print(string.format("[CustomBGMMod] [Notice] No custom music in '%s'. Original BGM retained.", HWA_DIR))
+end
+
+-- 6. Hook AutoSettings to force GameAudio.MusicVolume to "0" at runtime
+pcall(function()
+    RegisterHook("/Script/AutoSettings.SettingsManager:ApplySettingStatic", function(_, settingParam)
+        if not HasCustomMusic then return end
+        local setting = settingParam:get()
+        local key = setting.Key:ToString():lower()
+        if key == "gameaudio.musicvolume" then
+            if setting.Value:ToString() ~= "0" then
+                setting.Value = "0"
+                print("[CustomBGMMod] AutoSettings GameAudio.MusicVolume forced to 0.")
+            end
+        end
+    end)
+end)
+
+-- 7. Smart Deduplicated Audio Monitor (키 입력 없이 자동 디버그, 스팸 0%)
+local ReportedAudioMap = {}
+local HasReportedSummary = false
+
+local function InspectAndMuteAudio()
     if not HasCustomMusic then return end
 
     -- 1) GameInstance MusicVolumeChanged(0.0)
@@ -122,10 +106,6 @@ local function MuteGameAudio()
     if gi and gi:IsValid() then
         pcall(function()
             gi:MusicVolumeChanged(0.0)
-            if not HasAppliedGIMusicMute then
-                print("[CustomBGMMod] GI_Hans_C:MusicVolumeChanged(0.0) called successfully.")
-                HasAppliedGIMusicMute = true
-            end
         end)
     end
 
@@ -137,10 +117,6 @@ local function MuteGameAudio()
                 player.BackgroundMusic:SetVolumeMultiplier(0.0)
                 player.BackgroundMusic:Stop()
             end)
-            if not MutedComponentMap["BP_Hans_BGM"] then
-                print("[CustomBGMMod] Player pawn BackgroundMusic muted & stopped.")
-                MutedComponentMap["BP_Hans_BGM"] = true
-            end
         end
     end
 
@@ -152,59 +128,75 @@ local function MuteGameAudio()
                 level.Music:SetVolumeMultiplier(0.0)
                 level.Music:Stop()
             end)
-            if not MutedComponentMap["Level_Music"] then
-                print("[CustomBGMMod] Level Gameplay_MainElizarV Music muted & stopped.")
-                MutedComponentMap["Level_Music"] = true
-            end
         end
     end
 
-    -- 4) Scan ALL active AudioComponents matching music/BGM patterns
+    -- 4) Scan all active AudioComponents and log new ones automatically (스팸 방지)
     local allComps = FindAllOf("AudioComponent") or {}
     for _, comp in ipairs(allComps) do
         if comp:IsValid() then
-            local compFullName = comp:GetFullName():lower()
+            local compKey = comp:GetFullName()
             local soundFullName = ""
             pcall(function()
                 if comp.Sound and comp.Sound:IsValid() then
-                    soundFullName = comp.Sound:GetFullName():lower()
+                    soundFullName = comp.Sound:GetFullName()
                 end
             end)
 
-            local isMusicComp = compFullName:match("music") or compFullName:match("bgm")
-                or soundFullName:match("music") or soundFullName:match("bgm")
-                or soundFullName:match("soundtrack") or soundFullName:match("theme")
+            local compLower = compKey:lower()
+            local soundLower = soundFullName:lower()
 
-            if isMusicComp and comp.VolumeMultiplier ~= 0.0 then
-                pcall(function()
-                    comp:SetVolumeMultiplier(0.0)
-                    comp:Stop()
-                end)
-                if not MutedComponentMap[comp:GetFullName()] then
-                    print(string.format("[CustomBGMMod] Auto-muted Music AudioComponent: %s (Sound: %s)", comp:GetFullName(), soundFullName))
-                    MutedComponentMap[comp:GetFullName()] = true
+            local isMusic = compLower:match("music") or compLower:match("bgm")
+                or soundLower:match("music") or soundLower:match("bgm")
+                or soundLower:match("soundtrack") or soundLower:match("theme")
+
+            if isMusic then
+                -- 뮤트 적용
+                if comp.VolumeMultiplier ~= 0.0 then
+                    pcall(function()
+                        comp:SetVolumeMultiplier(0.0)
+                        comp:Stop()
+                    end)
+                end
+
+                -- 스팸 없이 1회만 자동 디버그 출력
+                if not ReportedAudioMap[compKey] then
+                    ReportedAudioMap[compKey] = true
+                    print(string.format("[CustomBGMMod] [AutoDebug] 게임 음악 뮤트 완료: %s | Sound: %s", compKey, soundFullName))
+                end
+            else
+                -- SFX 등 일반 사운드 컴포넌트는 최초 1회만 조용히 디버그 기록
+                if not ReportedAudioMap[compKey] then
+                    ReportedAudioMap[compKey] = true
+                    local vol = comp.VolumeMultiplier or 1.0
+                    local isPlaying = false
+                    pcall(function() isPlaying = comp:IsPlaying() end)
+                    if isPlaying then
+                        print(string.format("[CustomBGMMod] [AutoDebug] 효과음(SFX) 재생 감지: %s (Vol=%.2f)", soundFullName ~= "" and soundFullName or compKey, vol))
+                    end
                 end
             end
         end
     end
 end
 
--- Guardian loop: maintain muting and recheck tracks
+-- Guardian loop: 250ms periodic check
 LoopAsync(250, function()
     ExecuteInGameThread(function()
         if not HasCustomMusic then
             HasCustomMusic = CheckHasCustomMusic()
             if HasCustomMusic then
                 print(string.format("[CustomBGMMod] [Detected] New custom music added to '%s'!", HWA_DIR))
+                LaunchBGMPlayer()
             end
         end
 
-        MuteGameAudio()
+        InspectAndMuteAudio()
     end)
     return false
 end)
 
--- 6. In-Game Keybinds for Custom BGM Control & Debug
+-- 8. In-Game Keybinds for Custom BGM Control (F12 제거 완료)
 RegisterKeyBind(Key.F10, function()
     SendPlayerCommand("toggle")
     print("[CustomBGMMod] Key [F10]: BGM Play/Pause toggled.")
@@ -225,15 +217,10 @@ RegisterKeyBind(Key.PAGE_DOWN, function()
     print("[CustomBGMMod] Key [PageDown]: Volume -10%.")
 end)
 
--- [F12] Audio Diagnostics Dump Key
-RegisterKeyBind(Key.F12, function()
-    ExecuteInGameThread(DumpAudioState)
-end)
-
 print("[CustomBGMMod] Loaded! 단축키:")
 print("  - [F10]      : BGM 일시정지 / 재생 토글")
 print("  - [F11]      : 다음 곡 재생 (파일이 여러 개일 때)")
 print("  - [PageUp]   : 볼륨 10% 증가")
 print("  - [PageDown] : 볼륨 10% 감소")
-print("  - [F12]      : ★ [디버그] 현재 재생 중인 모든 오디오 컴포넌트 실시간 덤프")
+print("  - [자동 디버그]: 키 입력 없이 새 오디오 감지 시 1회만 자동 요약 출력")
 print("  - 커스텀 음악 경로: " .. HWA_DIR)
