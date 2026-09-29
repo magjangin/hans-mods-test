@@ -5,7 +5,6 @@ print("[CustomBGMMod] Hans Custom BGM Injector Loading...")
 print("==================================================")
 
 local HWA_DIR = [[H:\steam\steamapps\common\HANS\hwa]]
-local SETTINGS_INI = os.getenv("LOCALAPPDATA") .. "\\Hans\\Saved\\Config\\Windows\\Settings.ini"
 
 -- 1. Ensure target directory exists on game launch
 pcall(function()
@@ -39,28 +38,7 @@ end
 
 local HasCustomMusic = CheckHasCustomMusic()
 
--- 4. Pre-patch Settings.ini (GameAudio.MusicVolume=0) so game loads menu with 0 music volume
-local function PatchSettingsIniMusicVolumeZero()
-    if not HasCustomMusic then return end
-    local file = io.open(SETTINGS_INI, "r")
-    if not file then return end
-    local content = file:read("*a")
-    file:close()
-
-    local updated, count = content:gsub("GameAudio%.MusicVolume%s*=%s*[%d%.]+", "GameAudio.MusicVolume=0")
-    if count > 0 and updated ~= content then
-        local outFile = io.open(SETTINGS_INI, "w")
-        if outFile then
-            outFile:write(updated)
-            outFile:close()
-            print("[CustomBGMMod] Settings.ini GameAudio.MusicVolume -> 0 (선제 음소거 패치 완료)")
-        end
-    end
-end
-
-PatchSettingsIniMusicVolumeZero()
-
--- 5. Launch background player script
+-- 4. Launch background player script
 local HasLaunchedPlayer = false
 local function LaunchBGMPlayer()
     if HasLaunchedPlayer or not PlayerScript or not HasCustomMusic then return end
@@ -74,129 +52,128 @@ end
 LaunchBGMPlayer()
 
 if HasCustomMusic then
-    print(string.format("[CustomBGMMod] [Active] Custom music found in '%s'! Game music will be muted.", HWA_DIR))
+    print(string.format("[CustomBGMMod] [Active] 커스텀 음악 감지됨: '%s' (게임 순정 BGM 뮤트 활성화)", HWA_DIR))
 else
-    print(string.format("[CustomBGMMod] [Notice] No custom music in '%s'. Original BGM retained.", HWA_DIR))
+    print(string.format("[CustomBGMMod] [Notice] '%s' 폴더에 음악이 없습니다. 순정 BGM 유지.", HWA_DIR))
 end
 
--- 6. Hook AutoSettings to force GameAudio.MusicVolume to "0" at runtime
-pcall(function()
-    RegisterHook("/Script/AutoSettings.SettingsManager:ApplySettingStatic", function(_, settingParam)
-        if not HasCustomMusic then return end
-        local setting = settingParam:get()
-        local key = setting.Key:ToString():lower()
-        if key == "gameaudio.musicvolume" then
-            if setting.Value:ToString() ~= "0" then
-                setting.Value = "0"
-                print("[CustomBGMMod] AutoSettings GameAudio.MusicVolume forced to 0.")
-            end
-        end
-    end)
-end)
+-- 5. Audio State Management
+local MuteAmbientSFX = false -- [End] 키로 송풍기/바람 환경음도 함께 음소거 가능
+local KnownMusicComps = {}
+local LastSummaryTime = 0
+local LastPlayingSignature = ""
 
--- 7. Smart Deduplicated Audio Monitor (키 입력 없이 자동 디버그, 스팸 0%)
-local ReportedAudioMap = {}
-local HasReportedSummary = false
-
-local function InspectAndMuteAudio()
-    if not HasCustomMusic then return end
-
-    -- 1) GameInstance MusicVolumeChanged(0.0)
-    local gi = FindFirstOf("GI_Hans_C")
-    if gi and gi:IsValid() then
-        pcall(function()
-            gi:MusicVolumeChanged(0.0)
-        end)
-    end
-
-    -- 2) Target Known Actors: BP_Hans.BackgroundMusic
-    local player = UEHelpers.GetPlayer()
-    if player:IsValid() and player.BackgroundMusic and player.BackgroundMusic:IsValid() then
-        if player.BackgroundMusic.VolumeMultiplier ~= 0.0 then
-            pcall(function()
-                player.BackgroundMusic:SetVolumeMultiplier(0.0)
-                player.BackgroundMusic:Stop()
-            end)
-        end
-    end
-
-    -- 3) Target Known Actors: Gameplay_MainElizarV.Music
-    local level = FindFirstOf("Gameplay_MainElizarV_C")
-    if level and level:IsValid() and level.Music and level.Music:IsValid() then
-        if level.Music.VolumeMultiplier ~= 0.0 then
-            pcall(function()
-                level.Music:SetVolumeMultiplier(0.0)
-                level.Music:Stop()
-            end)
-        end
-    end
-
-    -- 4) Scan all active AudioComponents and log new ones automatically (스팸 방지)
+local function ProcessAudio()
     local allComps = FindAllOf("AudioComponent") or {}
+    local activeSFX = {}
+    local uflemeciCount = 0
+    local musicMutedCount = 0
+
+    -- 1) Target GameInstance if available
+    local gi = FindFirstOf("GI_Hans_C")
+    if gi and gi:IsValid() and HasCustomMusic then
+        pcall(function() gi:MusicVolumeChanged(0.0) end)
+    end
+
+    -- 2) Scan all AudioComponents
     for _, comp in ipairs(allComps) do
         if comp:IsValid() then
-            local compKey = comp:GetFullName()
-            local soundFullName = ""
+            local compName = comp:GetFullName()
+            local soundPath = ""
             pcall(function()
                 if comp.Sound and comp.Sound:IsValid() then
-                    soundFullName = comp.Sound:GetFullName()
+                    soundPath = comp.Sound:GetFullName()
                 end
             end)
 
-            local compLower = compKey:lower()
-            local soundLower = soundFullName:lower()
+            local compLower = compName:lower()
+            local soundLower = soundPath:lower()
 
             local isMusic = compLower:match("music") or compLower:match("bgm")
                 or soundLower:match("music") or soundLower:match("bgm")
                 or soundLower:match("soundtrack") or soundLower:match("theme")
 
-            if isMusic then
-                -- 뮤트 적용
+            local isAmbient = soundLower:match("uflemeci") or soundLower:match("wind")
+
+            if isMusic and HasCustomMusic then
+                -- BGM 음소거 유지
                 if comp.VolumeMultiplier ~= 0.0 then
                     pcall(function()
                         comp:SetVolumeMultiplier(0.0)
                         comp:Stop()
                     end)
                 end
-
-                -- 스팸 없이 1회만 자동 디버그 출력
-                if not ReportedAudioMap[compKey] then
-                    ReportedAudioMap[compKey] = true
-                    print(string.format("[CustomBGMMod] [AutoDebug] 게임 음악 뮤트 완료: %s | Sound: %s", compKey, soundFullName))
+                musicMutedCount = musicMutedCount + 1
+                if not KnownMusicComps[compName] then
+                    KnownMusicComps[compName] = true
+                    print(string.format("[CustomBGMMod] [BGM 차단] 순정 음악 뮤트 성공: %s (Sound: %s)", compName, soundPath))
+                end
+            elseif isAmbient then
+                if MuteAmbientSFX then
+                    pcall(function()
+                        comp:SetVolumeMultiplier(0.0)
+                        comp:Stop()
+                    end)
+                end
+                local isPlaying = false
+                pcall(function() isPlaying = comp:IsPlaying() end)
+                if isPlaying then
+                    if soundLower:match("uflemeci") then
+                        uflemeciCount = uflemeciCount + 1
+                    else
+                        activeSFX[#activeSFX + 1] = soundPath
+                    end
                 end
             else
-                -- SFX 등 일반 사운드 컴포넌트는 최초 1회만 조용히 디버그 기록
-                if not ReportedAudioMap[compKey] then
-                    ReportedAudioMap[compKey] = true
-                    local vol = comp.VolumeMultiplier or 1.0
-                    local isPlaying = false
-                    pcall(function() isPlaying = comp:IsPlaying() end)
-                    if isPlaying then
-                        print(string.format("[CustomBGMMod] [AutoDebug] 효과음(SFX) 재생 감지: %s (Vol=%.2f)", soundFullName ~= "" and soundFullName or compKey, vol))
-                    end
+                local isPlaying = false
+                pcall(function() isPlaying = comp:IsPlaying() end)
+                if isPlaying then
+                    activeSFX[#activeSFX + 1] = soundPath
                 end
             end
         end
     end
+
+    -- 3) 스팸 없는 실시간 요약 로깅 (상태가 변했거나 10초 경과 시 출력)
+    local now = os.clock()
+    local signature = string.format("music:%d|uflemeci:%d|sfx:%d|muteAmb:%s", musicMutedCount, uflemeciCount, #activeSFX, tostring(MuteAmbientSFX))
+    if signature ~= LastPlayingSignature or (now - LastSummaryTime > 15.0) then
+        LastPlayingSignature = signature
+        LastSummaryTime = now
+
+        print("\n[CustomBGMMod] ================= [인게임 오디오 실시간 모니터] =================")
+        print(string.format("  - 순정 BGM 상태     : %s (뮤트된 BGM 컴포넌트: %d개)", HasCustomMusic and "차단됨 (0.0 Vol)" or "정상 재생 중", musicMutedCount))
+        print(string.format("  - 송풍기 기믹(SFX)  : %d개 재생 중 (MuteAmbient=%s) -> [End] 키로 끄기 가능", uflemeciCount, tostring(MuteAmbientSFX)))
+        if #activeSFX > 0 then
+            print("  - 기타 활성 효과음(SFX):")
+            for i = 1, math.min(#activeSFX, 5) do
+                print(string.format("      * %s", activeSFX[i]))
+            end
+            if #activeSFX > 5 then
+                print(string.format("      * (외 %d개 효과음)", #activeSFX - 5))
+            end
+        end
+        print("========================================================================\n")
+    end
 end
 
--- Guardian loop: 250ms periodic check
-LoopAsync(250, function()
+-- Guardian loop: 300ms
+LoopAsync(300, function()
     ExecuteInGameThread(function()
         if not HasCustomMusic then
             HasCustomMusic = CheckHasCustomMusic()
             if HasCustomMusic then
-                print(string.format("[CustomBGMMod] [Detected] New custom music added to '%s'!", HWA_DIR))
+                print(string.format("[CustomBGMMod] [Detected] 새 커스텀 음악 발견: '%s'", HWA_DIR))
                 LaunchBGMPlayer()
             end
         end
 
-        InspectAndMuteAudio()
+        ProcessAudio()
     end)
     return false
 end)
 
--- 8. In-Game Keybinds for Custom BGM Control (F12 제거 완료)
+-- 6. In-Game Keybinds
 RegisterKeyBind(Key.F10, function()
     SendPlayerCommand("toggle")
     print("[CustomBGMMod] Key [F10]: BGM Play/Pause toggled.")
@@ -204,23 +181,30 @@ end)
 
 RegisterKeyBind(Key.F11, function()
     SendPlayerCommand("next")
-    print("[CustomBGMMod] Key [F11]: Skip to next track.")
+    print("[CustomBGMMod] Key [F11]: 다음 곡으로 건너뛰기.")
 end)
 
 RegisterKeyBind(Key.PAGE_UP, function()
     SendPlayerCommand("vol_up")
-    print("[CustomBGMMod] Key [PageUp]: Volume +10%.")
+    print("[CustomBGMMod] Key [PageUp]: 커스텀 BGM 볼륨 +10%.")
 end)
 
 RegisterKeyBind(Key.PAGE_DOWN, function()
     SendPlayerCommand("vol_down")
-    print("[CustomBGMMod] Key [PageDown]: Volume -10%.")
+    print("[CustomBGMMod] Key [PageDown]: 커스텀 BGM 볼륨 -10%.")
+end)
+
+-- [End] 키: 시끄러운 송풍기(Uflemeci) 및 바람 환경음 원클릭 음소거 토글!
+RegisterKeyBind(Key.END, function()
+    MuteAmbientSFX = not MuteAmbientSFX
+    print(string.format("\n[CustomBGMMod] Key [End]: 송풍기/바람 환경 효과음 음소거 -> %s\n", MuteAmbientSFX and "ON (소음 차단)" or "OFF (원래대로)"))
 end)
 
 print("[CustomBGMMod] Loaded! 단축키:")
 print("  - [F10]      : BGM 일시정지 / 재생 토글")
 print("  - [F11]      : 다음 곡 재생 (파일이 여러 개일 때)")
-print("  - [PageUp]   : 볼륨 10% 증가")
-print("  - [PageDown] : 볼륨 10% 감소")
-print("  - [자동 디버그]: 키 입력 없이 새 오디오 감지 시 1회만 자동 요약 출력")
+print("  - [PageUp]   : 커스텀 BGM 볼륨 10% 증가")
+print("  - [PageDown] : 커스텀 BGM 볼륨 10% 감소")
+print("  - [End]      : ★ 시끄러운 송풍기/바람 환경음(SFX) 원클릭 음소거 토글")
+print("  - [자동 모니터] : 오디오 변경 시 요약 박스 자동 로깅 (스팸 0%)")
 print("  - 커스텀 음악 경로: " .. HWA_DIR)
