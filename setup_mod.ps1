@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "config.ps1")
 
 Write-Banner "HANS UE4SS 모드 연결 및 활성화"
@@ -90,4 +90,8 @@ Write-Host ""
 Write-Host "  [UnlockAllMod]" -ForegroundColor Cyan
 Write-Host "  ★ 키 입력 없이 게임 실행 시 45종 스킨 & 23종 업적 전자동 해금!" -ForegroundColor Yellow
 Write-Host "  (비상 수동 단축키: [F7] 스킨 / [F8] 업적&Steam / [F9] 전체)" -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "  [CustomBGMMod]" -ForegroundColor Cyan
+Write-Host "  ★ H:\steam\steamapps\common\HANS\hwa 폴더에 .ogg/.mp3 넣으면 BGM 자동 교체!" -ForegroundColor Yellow
+Write-Host "  (단축키: [F10] 일시정지/재생 | [F11] 다음곡 | [PageUp/Down] 볼륨)" -ForegroundColor White
 Write-Host "========================================================" -ForegroundColor Cyan

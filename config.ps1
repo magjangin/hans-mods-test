@@ -1,4 +1,4 @@
-﻿# 스크립트 공용 설정. 다른 .ps1 파일이 dot-source(. config.ps1)로 불러 쓴다.
+# 스크립트 공용 설정. 다른 .ps1 파일이 dot-source(. config.ps1)로 불러 쓴다.
 # 게임이 다른 위치에 설치되어 있으면 $GameDir만 고치면 된다.
 # (게임 안에서도 실행되는 UnlockAllMod\unlock_steam_achievements.py는 자체 GAME_DIR 상수를 쓴다)
 
@@ -8,7 +8,7 @@ $GameModsDir = Join-Path $GameDir "Hans\Binaries\Win64\ue4ss\Mods"
 $ModsTxt     = Join-Path $GameModsDir "mods.txt"
 $SteamAppId  = 2616420
 
-$ModNames = @("GravityMod", "WindowModeFix", "UnlockAllMod")
+$ModNames = @("GravityMod", "WindowModeFix", "UnlockAllMod", "CustomBGMMod")
 
 $SaveDir = Join-Path $env:LOCALAPPDATA "Hans\Saved\SaveGames"
 

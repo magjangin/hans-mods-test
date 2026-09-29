@@ -25,6 +25,7 @@
 * 🕹️ **GravityMod:** 맵 이동 및 리스폰 시에도 풀리지 않는 실시간 중력 제어기 (무중력, 달 중력, 공중 부유 등)
 * 🖥️ **WindowModeFix:** 타이틀 및 메인 메뉴 진입 시 창 모드가 강제로 전체화면으로 초기화되는 버그의 무간섭 자동 교정기
 * 🏆 **UnlockAllMod:** 45종 모든 수박 스킨 및 23종 모든 업적(실제 Steam 도전과제 연동 포함) 실시간/오프라인 올인원 해금기
+* 🎵 **CustomBGMMod:** 게임 실행 시 BGM 폴더(`H:\steam\steamapps\common\HANS\hwa`) 자동 생성 및 커스텀 음원(`.ogg`/`.mp3` 등) 실시간 자동 교체 재생기
 * ⚡ **Hot-Sync 배포 자동화:** NTFS Directory Junction을 활용하여 파일 복사 없이 코드 수정이 게임에 즉각 반영되는 원클릭 관리 스크립트 제공
 
 ---
@@ -74,6 +75,22 @@ HANS의 내장 블루프린트(`WBP_MainMenuUI`)는 메인 메뉴에 진입할 �
   * **`F7` / `Num 7`**: 모든 45종 스킨 수동 재해금
   * **`F8` / `Num 8`**: 모든 23종 업적 수동 재해금 & Steam 도전과제 재전송
   * **`F9` / `Num 9`**: 스킨 + 업적 올인원 수동 전체 재해금
+
+---
+
+### 4. 🎵 CustomBGMMod (사용자 커스텀 배경음악 교체 모드)
+> **모듈 경로:** [`CustomBGMMod/`](file:///h:/ue4ss%20mod%20test/hans%20mods%20test/CustomBGMMod) | **상세 문서:** [`CustomBGMMod/README.md`](file:///h:/ue4ss%20mod%20test/hans%20mods%20test/CustomBGMMod/README.md)
+
+게임 실행 시 지정된 폴더를 모니터링하여, 사용자가 넣은 `.ogg`, `.mp3`, `.wav` 음원을 게임 배경음악으로 실시간 자동 교체합니다.
+
+* 📂 **폴더 자동 생성:** 게임 실행 시 `H:\steam\steamapps\common\HANS\hwa` 폴더가 없으면 모드가 즉시 자동 생성합니다.
+* 🎧 **포맷 지원:** `.ogg` (강력 추천), `.mp3`, `.wav`, `.flac`
+* 🔇 **게임 순정 BGM 스마트 뮤트:** `hwa` 폴더에 음악이 있을 때만 게임 내 BGM 컴포넌트(`BP_Hans.BackgroundMusic`, `Gameplay_MainElizarV.Music`)를 음소거하며, 음악이 없으면 원래 BGM이 그대로 유지됩니다.
+* 🎮 **조작 단축키:**
+  * **`F10`** : BGM 일시정지 / 다시 재생 토글
+  * **`F11`** : 다음 트랙으로 넘기기 (여러 곡이 들어있을 때)
+  * **`Page Up`** : BGM 볼륨 10% 증가
+  * **`Page Down`** : BGM 볼륨 10% 감소
 
 ---
 
