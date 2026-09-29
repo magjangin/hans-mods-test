@@ -201,6 +201,9 @@ hans-mods-test/
 ├── unlock_all.ps1                # 스킨 & 업적 세이브 바이너리 패처 PowerShell 스크립트
 ├── README.md                     # 프로젝트 메인 문서 (본 문서)
 │
+├── docs/                         # 기술 분석 및 연구 문서
+│   └── AUDIO_RESEARCH.md         # 오디오 파이프라인 분석 및 MASTER 버스 직결 누수 연구 기록
+│
 ├── GravityMod/                   # [모듈 1] 실시간 중력 제어기
 │   ├── enabled.txt               # 모드 활성화 플래그
 │   ├── README.md                 # GravityMod 기술 세부 문서
@@ -258,29 +261,6 @@ hans-mods-test/
 
 ---
 
-## 🎵 오디오 파이프라인 분석 & BGM 모딩 연구 기록 (Audio Research Notes)
+## 📚 추가 연구 및 기술 문서 (Documentation)
 
-> **핵심 발견 (Lead Modder 화평):** 인게임 오디오 설정의 서브 채널(`음악`, `음향 효과`)을 100% 음소거하더라도, 최상위 `MASTER` 버스를 직결(Direct Route)하여 출력되는 순정 사운드 누수 현상 확인.
-
-```mermaid
-flowchart TD
-    subgraph "HANS 오디오 라우팅 아키텍처"
-        A[인게임 사운드 에셋 / MetaSound] --> B{사운드 클래스 라우팅}
-        B -->|정상 서브 채널| C[음악 SoundClass]
-        B -->|정상 서브 채널| D[음향 효과 SoundClass]
-        B -->|누수 경로 (Bypass)| E[MASTER 최상위 버스 직결]
-        
-        C -->|모드로 뮤트 완료| F[차단됨 (Muted)]
-        D -->|모드로 뮤트 완료| G[차단됨 (Muted)]
-        E -->|필터링 우회| H[스피커로 소리 흘러나옴 (Sound Leak)]
-    end
-```
-
-### 1. 현상 분석 및 원인 규명
-* **슬라이더 계층 구조:** HANS의 오디오 옵션 메뉴는 `MASTER`, `음악`, `음향 효과` 3단계 슬라이더로 구성되어 있습니다.
-* **하위 채널 뮤트 확인:** 모드를 통해 `음악(Music)` 및 `음향 효과(SFX)` 서브 채널과 컴포넌트를 모두 차단했을 때, 하위 2개 채널은 정상적으로 침묵 처리되는 것을 확인했습니다.
-* **MASTER 채널 직결 누수:** 그러나 특정 배경음/앰비언스 또는 시스템 사운드가 하위 사운드 클래스를 경유하지 않고 최상위 **`MASTER` 채널에 직접 출력(Bypass Routing)**되도록 설계되어 있어, 하위 채널을 꺼도 `MASTER`를 타고 순정 소리가 흘러나와 커스텀 음원과 섞여 들리는 원인이 되었습니다.
-
-### 2. 향후 BGM 교체 모딩을 위한 로드맵 제언
-* **방안 A (엔진 레벨 Master Bus 가로채기):** 하위 서브 채널 대신 최상위 Master SoundMix / SoundClass 단에서 라우팅 자체를 가로채거나 `GI_Hans:MasterVolumeChanged(0.0)` 및 윈도우 오디오 믹서 레벨에서 격리.
-* **방안 B (IoStore 에셋 레벨 교체 - 강력 권장):** 런타임 오디오 컴포넌트 후킹 대신, 언리얼 엔진 5의 IoStore(`Hans-Windows.pak`/`.ucas`) 내 실제 BGM 에셋(`MetaSoundSource /Game/HANS/SFX/Music/Music.Music`)을 언리얼 모딩 툴킷으로 추출하여 사일런트 또는 커스텀 트랙으로 치환한 모드 PAK(`~mods`)을 주입하는 방식이 가장 근본적이고 안정적인 해결책입니다.
+* 🎵 [**HANS 오디오 파이프라인 분석 & BGM 모딩 연구 기록**](file:///h:/ue4ss%20mod%20test/hans%20mods%20test/docs/AUDIO_RESEARCH.md) (`docs/AUDIO_RESEARCH.md`): 인게임 사운드 클래스 계층 구조 및 MASTER 버스 직결 누수(Bypass) 현상 분석 리포트
