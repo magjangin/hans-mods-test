@@ -8,7 +8,7 @@ $GameModsDir = Join-Path $GameDir "Hans\Binaries\Win64\ue4ss\Mods"
 $ModsTxt     = Join-Path $GameModsDir "mods.txt"
 $SteamAppId  = 2616420
 
-$ModNames = @("GravityMod", "WindowModeFix", "UnlockAllMod", "CustomBGMMod")
+$ModNames = @("GravityMod", "WindowModeFix", "UnlockAllMod")
 
 $SaveDir = Join-Path $env:LOCALAPPDATA "Hans\Saved\SaveGames"
 

@@ -90,8 +90,4 @@ Write-Host ""
 Write-Host "  [UnlockAllMod]" -ForegroundColor Cyan
 Write-Host "  ★ 키 입력 없이 게임 실행 시 45종 스킨 & 23종 업적 전자동 해금!" -ForegroundColor Yellow
 Write-Host "  (비상 수동 단축키: [F7] 스킨 / [F8] 업적&Steam / [F9] 전체)" -ForegroundColor DarkGray
-Write-Host ""
-Write-Host "  [CustomBGMMod]" -ForegroundColor Cyan
-Write-Host "  ★ H:\steam\steamapps\common\HANS\hwa 에 .ogg/.mp3 넣으면 키 입력 없이 순정 소리 100% 완전 차단!" -ForegroundColor Yellow
-Write-Host "  (순수 커스텀 음악 단독 재생 모드 - 키 조작 불필요)" -ForegroundColor White
 Write-Host "========================================================" -ForegroundColor Cyan
